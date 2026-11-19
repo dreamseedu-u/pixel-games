@@ -238,6 +238,7 @@ p_bee:["....ww.ww...", "...wwwkwww..", "....kkkkk...", "..kyykyykyk.", ".kyykyyk
 p_slime:["............", "....kkkk....", "...kccack...", "..kcwwacck..", ".kccwaccack.", ".kcckcckccck", ".kccccccccck", ".knccccccnk.", "..kkkkkkkk..", "............"],
 pwing:["k......k", "wk....kw", "wwk..kww", ".wk..kw.", "..k..k.."],
 pcrown:["y.y.y", "yyyyy", "kkkkk"],
+horns:["kk..........kk", "kwk........kwk", ".kwk......kwk.", "..kk......kk.."],bshield:[".kkkk.", "ksyysk", "ksyysk", "kssssk", "kssssk", ".kssk.", "..kk.."],w_great:["...k...", "..kwk..", "..kwk..", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", "kyyyyyk", "..kmk..", "..kmk..", "..kyk..", "...k..."],
 shur:["..w..",".sws.","wwkww",".sws.","..w.."]
 };
 const ICONS={armor:['armor'],sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],fire:['fire'],bolt:['bolt'],blade:['blade'],frost:['frost'],
@@ -775,11 +776,13 @@ function drawHero(){const h=G.h,J=SAVE.job||{},jb=J.b?J.b+J.t:'';const walk=G.wa
  const bob=(!G.walking&&h.atkAnim<=0&&Math.floor(h.anim*2)%2)?1:0;let x=Math.round(h.x-8+(h.atkAnim>0?1:0)),y=GY-20+bob;
  if(h.dead){ctx.globalAlpha=Math.max(0,1-G.deadT*.6);y+=Math.min(6,G.deadT*10)}
  if(G.mods.shadow&&!h.dead){const sh=SC['shd'+fr+jb]||(SC['shd'+fr+jb]=sil(s.c,'#3a1f5c'));const a=ctx.globalAlpha;ctx.globalAlpha=.55*a;ctx.drawImage(sh,x-8+(h.shT>0?7:0),y-1);ctx.globalAlpha=a;if(h.shT>0)h.shT-=1/60}
- const wn=J.b==='mage'?'w_staff':J.b==='rogue'?'w_dagger':'w_sword',wt=J.t||0;
- const ws=spr(wn+wt,MAPS[wn],wt>=3?{w:'y',s:'o',a:'y',m:'M'}:wt>=2?{a:'c',s:'d'}:null),gp={w_sword:[2,10],w_staff:[2,10],w_dagger:[1,5]}[wn];
+ const wn=J.b==='mage'?'w_staff':J.b==='rogue'?'w_dagger':(J.b==='war'&&J.t>=3)?'w_great':'w_sword',wt=J.t||0;
+ if(J.b==='war'&&J.t>=1){const bs=spr('bsh'+J.t,MAPS.bshield,J.t>=3?{s:'y',y:'r'}:J.t>=2?{y:'r'}:null);ctx.drawImage(bs.c,x,y+11)}
+ const ws=spr(wn+wt,MAPS[wn],wt>=3?{w:'y',s:'o',a:'y',m:'M'}:wt>=2?{a:'c',s:'d'}:null),gp={w_sword:[2,10],w_staff:[2,10],w_dagger:[1,5],w_great:[3,11]}[wn];
  ctx.drawImage(h.flash>0?s.wh:s.c,x,y);
  if(h.atkAnim>0){const rc=rotCW(ws,wn+wt);ctx.drawImage(rc,x+14-(ws.h-1-gp[1]),y+12-gp[0])}
  else ctx.drawImage(ws.c,x+13-gp[0],y+12-gp[1]+(walk&&fr==='hb_b'?1:0));
+ if(J.b==='war'&&J.t>=2){const hs=spr('horn'+J.t,MAPS.horns,J.t>=3?{w:'y'}:null);ctx.drawImage(hs.c,x+1,y+1)}
  if(J.b==='mage'&&J.t>=1){const hs=spr('hat'+J.t,MAPS.hat,J.t>=3?{v:'n',y:'a'}:J.t>=2?{v:'p'}:null);ctx.drawImage(hs.c,x+2,y-1)}
  if(J.t>=3&&!h.dead&&Math.random()<.2)G.parts.push({x:h.x+rnd(-6,6),y:GY-rnd(4,20),vx:0,vy:-12,life:.5,c:J.b==='war'?'#ffcd75':J.b==='mage'?'#73eff7':'#9d5ad6',s:1,g:0});
  ctx.globalAlpha=1;
