@@ -72,7 +72,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <div class="sub" id="titleInfo"></div>
     <button class="btn gold" id="bCont" style="display:none">▶ 이어하기</button>
     <button class="btn gold" id="bStart">▶ 사냥 시작</button>
-    <div class="row"><button class="btn" id="bShop1" style="min-width:0;flex:1">영혼 강화</button><button class="btn" id="bEquip1" style="min-width:0;flex:1">장비</button></div>
+    <div class="row"><button class="btn" id="bShop1" style="min-width:0;flex:1">영혼 강화</button><button class="btn" id="bEquip1" style="min-width:0;flex:1">장비</button><button class="btn" id="bPet1" style="min-width:0;flex:1">펫</button></div>
     <button class="btn sm" id="bInstall" style="display:none;background:#38b764">📲 홈 화면에 바로가기 추가</button>
     <button class="btn sm gray" id="bSnd1">소리: 켜짐</button>
   </div>
@@ -106,6 +106,13 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <div class="sub">몬스터·보스가 떨어뜨린 장비 중 더 좋은 것을 자동 장착합니다<br>약한 장비는 영혼으로 바뀝니다</div>
     <div class="shoplist" id="equipList"></div>
     <button class="btn" id="bEquipBack">돌아가기</button>
+  </div>
+
+  <div class="ov" id="ovPet">
+    <div class="hd">펫</div>
+    <div class="sub">보스·정예가 떨어뜨리는 알에서 부화 · 최대 3마리 동행<br>Lv10·Lv20에 진화 · 같은 펫 알은 경험치로 바뀝니다</div>
+    <div class="shoplist" id="petList"></div>
+    <button class="btn" id="bPetBack">돌아가기</button>
   </div>
 
   <div class="ov" id="ovShop">
@@ -166,6 +173,17 @@ gem:["..kkkkk..",".kawaaak.","kawaaaaak","kaaaaaack",".kaaacck.","..kaack..","..
 shield:[".kkkkkkk.","kssssssdk","kswssssdk","ksssssddk","ksssssddk",".ksssddk.",".kssddk..","..ksdk...","...kk...."],
 skull:[".kkkkkk..","kwwwwwwk.","kwwwwwwwk","kwkkwkkwk","kwkkwkkwk","kwwwkwwwk",".kwwwwwk.",".kwkwkwk.","..kkkkk.."],
 armor:[".kk...kk.","kbbk.kbbk","kbbbkbbbk","kbwbbbbbk",".kbbbbbk.",".kbbybbk.",".kbbbbbk.",".kbbbbbk.","..kkkkk.."],
+p_dragon:["k......k","kr.kk.rk",".krrrrk.","krwkrrrk","krrrrryk",".krrrrk.","..kr.rk.","..k..k.."],
+p_fairy:["..a..a..",".awa.awa","..kyyk..",".kyywyk.","..kyyk..","...kk...","..a..a..","........"],
+p_cat:["k.....k.","yk...ky.","kyyyyyyk","kykyykyk","kyyrryyk",".kyyyyk.",".kykkyk.",".kk..kk."],
+p_ice:["...kk...","..kaak..",".kawaak.","kaakkaak","kaaaaaak",".kacaak.","..kaak..","...kk..."],
+p_ghost:["..kkkk..",".kwwwwk.","kwkwwkwk","kwwwwwwk","kwwwwwwk","kwwwwwwk","kwkwkwkw",".k.k.k.k"],
+p_wolf:["k....k..","sk..ks..","ksssssk.","kskssssk","kssssswk",".ksssk..",".ks.ks..",".kk.kk.."],
+p_owl:["k.....k.","kokkkok.","kykokyk.","kooyook.","koowook.","kooooook",".kooook.","..k..k.."],
+p_turtle:["........","...kkkk.","..kgtgtk",".kgtgtgk","kfkkkkkk","kfk.k.k.","........","........"],
+p_bee:["..k..k..","..wkkw..",".kykyk..","kykykyk.",".kykykw.","..kkkk..","........","........"],
+p_slime:["........","..kkkk..",".kccack.","kcwccack","kckcckck","kcccccck",".kkkkkk.","........"],
+egg:["..kkk..",".kwwwk.","kwwywwk","kwwwwyk","kwywwwk","kwwwwwk",".kkkkk."],
 shur:["..w..",".sws.","wwkww",".sws.","..w.."]
 };
 const ICONS={armor:['armor'],sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],fire:['fire'],bolt:['bolt'],blade:['blade'],frost:['frost'],
@@ -289,7 +307,7 @@ function setMute(m){muted=m;if(master)master.gain.value=m?0:.4;const l='소리: 
 function vib(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 
 // ---------- save / meta
-let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,lv:1,xp:0,job:{b:null,t:0},eq:{},meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
+let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,lv:1,xp:0,job:{b:null,t:0},eq:{},pets:{},party:[],meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
 function load(){try{const s=JSON.parse(localStorage.getItem('pxhunter_v1')||'null');if(s)SAVE={...SAVE,...s,meta:{...SAVE.meta,...(s.meta||{})}}}catch(e){}}
 function save(){try{localStorage.setItem('pxhunter_v1',JSON.stringify(SAVE))}catch(e){}}
 const RUNKEY='pxhunter_run_v1';
@@ -342,18 +360,32 @@ const SPECC=[
  {id:'midas',r:3,name:'미다스의 손',icon:'coin',d:'골드 획득 +150%',f:()=>G.mods.gold+=1.5}];
 const JOBLV=[100,200,300],REBIRTH_ST=20,REBIRTH_B=.1;
 const JOBS={
- war:{n:'검사 계열',icon:'sword',sw:[{b:'s',n:'d'},{b:'s',n:'d',r:'y'},{b:'y',n:'o',r:'w'}],t:[
-  {name:'검사',d:'공격력 +20%, 최대 체력 +20%',f:()=>{G.mods.atk+=.2;G.mods.hp+=.2}},
-  {name:'기사',d:'받는 피해 -20%, 치명타 피해 +40%',f:()=>{G.mods.dr+=.2;G.mods.critDmg+=.4}},
-  {name:'소드마스터',d:'기본 공격 3번마다 적을 꿰뚫는 검기 발사 (공격력 300%)',f:()=>G.mods.wave=true}]},
- mage:{n:'마법 계열',icon:'fire',sw:[{b:'v',n:'p'},{b:'v',n:'p',r:'a'},{b:'p',n:'k',r:'a',y:'a'}],t:[
-  {name:'마법사',d:'스킬 피해 +30%, 빈 슬롯이 있으면 랜덤 스킬 1개 획득',f:()=>{G.mods.skill+=.3;if(G.skills.length<4){const ids=Object.keys(SKILLS).filter(id=>!G.skills.find(s=>s.id===id));if(ids.length)G.skills.push({id:pick(ids),lv:1,t:.3})}}},
-  {name:'원소술사',d:'스킬 쿨타임 -15%, 스킬 피해 +20%',f:()=>{G.mods.cdr+=.15;G.mods.skill+=.2}},
-  {name:'대마법사',d:'스킬 사용 시 25% 확률로 한 번 더 시전',f:()=>G.mods.echo=.25}]},
- rogue:{n:'암살 계열',icon:'skull',sw:[{b:'g',n:'t'},{b:'e',n:'k'},{b:'k',n:'p',r:'v',y:'v'}],t:[
-  {name:'도적',d:'공격 속도 +20%, 치명타 확률 +10%',f:()=>{G.mods.spd+=.2;G.mods.crit+=.1}},
-  {name:'암살자',d:'치명타 피해 +50%, 흡혈 +3%',f:()=>{G.mods.critDmg+=.5;G.mods.ls+=.03}},
-  {name:'그림자 군주',d:'그림자 분신이 함께 공격 (추가 피해 60%)',f:()=>G.mods.shadow=true}]}};
+ war:{n:'검사 계열',icon:'sword',sw:[{b:'s',n:'d'},{b:'s',n:'d',r:'y'},{b:'y',n:'o',r:'w'}],
+  t1:{name:'검사',d:'공격력 +20%, 최대 체력 +20%',f:()=>{G.mods.atk+=.2;G.mods.hp+=.2}},
+  t2:[{name:'기사',d:'받는 피해 -20%, 치명타 피해 +40%',f:()=>{G.mods.dr+=.2;G.mods.critDmg+=.4}},
+   {name:'광전사',d:'공격력 +40%, 공격 속도 +15%',f:()=>{G.mods.atk+=.4;G.mods.spd+=.15}},
+   {name:'성기사',d:'최대 체력 +50%, 초당 체력 1% 재생',f:()=>{G.mods.hp+=.5;G.mods.regen+=.01}}],
+  t3:[{name:'소드마스터',d:'기본 공격 3번마다 적을 꿰뚫는 검기 (공격력 300%)',f:()=>G.mods.wave=true},
+   {name:'버서커 로드',d:'기본 공격 2연타 + 범위 공격',f:()=>{G.mods.double=true;G.mods.cleave=true}},
+   {name:'수호신',d:'받는 피해 -20%, 받은 피해 100% 반사',f:()=>{G.mods.dr+=.2;G.mods.thorns+=1}}]},
+ mage:{n:'마법 계열',icon:'fire',sw:[{b:'v',n:'p'},{b:'v',n:'p',r:'a'},{b:'p',n:'k',r:'a',y:'a'}],
+  t1:{name:'마법사',d:'스킬 피해 +30%, 빈 슬롯이 있으면 랜덤 스킬 1개 획득',f:()=>{G.mods.skill+=.3;if(G.skills.length<4){const ids=Object.keys(SKILLS).filter(id=>!G.skills.find(s=>s.id===id));if(ids.length)G.skills.push({id:pick(ids),lv:1,t:.3})}}},
+  t2:[{name:'원소술사',d:'스킬 쿨타임 -15%, 스킬 피해 +20%',f:()=>{G.mods.cdr+=.15;G.mods.skill+=.2}},
+   {name:'흑마법사',d:'스킬 피해 +50%, 흡혈 +3%',f:()=>{G.mods.skill+=.5;G.mods.ls+=.03}},
+   {name:'시간술사',d:'스킬 쿨타임 -25%',f:()=>{G.mods.cdr+=.25}}],
+  t3:[{name:'대마법사',d:'스킬 사용 시 25% 확률로 한 번 더 시전',f:()=>G.mods.echo=.25},
+   {name:'파멸의 군주',d:'스킬 피해 +100%',f:()=>{G.mods.skill+=1}},
+   {name:'현자',d:'스킬 쿨타임 -15%, 경험치·골드 +50%',f:()=>{G.mods.cdr+=.15;G.mods.xp+=.5;G.mods.gold+=.5}}]},
+ rogue:{n:'암살 계열',icon:'skull',sw:[{b:'g',n:'t'},{b:'e',n:'k'},{b:'k',n:'p',r:'v',y:'v'}],
+  t1:{name:'도적',d:'공격 속도 +20%, 치명타 확률 +10%',f:()=>{G.mods.spd+=.2;G.mods.crit+=.1}},
+  t2:[{name:'암살자',d:'치명타 피해 +50%, 흡혈 +3%',f:()=>{G.mods.critDmg+=.5;G.mods.ls+=.03}},
+   {name:'레인저',d:'공격 속도 +35%',f:()=>{G.mods.spd+=.35}},
+   {name:'독술사',d:'치명타 확률 +15%, 치명타 피해 +30%',f:()=>{G.mods.crit+=.15;G.mods.critDmg+=.3}}],
+  t3:[{name:'그림자 군주',d:'그림자 분신이 함께 공격 (추가 피해 60%)',f:()=>G.mods.shadow=true},
+   {name:'질풍검객',d:'공격 속도 +50%, 기본 공격 2연타',f:()=>{G.mods.spd+=.5;G.mods.double=true}},
+   {name:'처형자',d:'치명타 피해 +150%',f:()=>{G.mods.critDmg+=1.5}}]}};
+function jobTier(b,i,p){const J=JOBS[b];return i===0?J.t1:i===1?J.t2[p[0]||0]:J.t3[p[1]||0]}
+function jobName(){const J=SAVE.job;return J&&J.b&&J.t?jobTier(J.b,J.t-1,J.p||[]).name:''}
 const IRAR=[{n:'일반',c:'#94b0c2'},{n:'희귀',c:'#41a6f6'},{n:'영웅',c:'#c46cf0'},{n:'전설',c:'#ffcd75'},{n:'신화',c:'#ff4d6a'}];
 const IRM=[1,1.6,2.5,4,6.5];
 const ISLOT={weapon:{n:'무기',icon:'sword',main:'atk',names:['녹슨 검','강철 검','룬 블레이드','용살검','태초의 검']},
@@ -381,6 +413,31 @@ const RELICS={
  ring:{n:'번개 반지',icon:'bolt',d:'기본 공격 시 20% 확률로 번개 (공격력 150%)'},
  frostH:{n:'서리 심장',icon:'frost',d:'나를 때린 적을 2초간 둔화'}};
 const hasR=id=>G&&G.relics&&G.relics.includes(id);
+const PETS={
+ cat:{t:0,f:['황금 고양이','부자 고양이','재물신 고양이'],d:p=>`골드 +${Math.round(10*p)}%`},
+ bee:{t:0,f:['꿀벌','말벌','여왕벌'],d:p=>`0.6초마다 침 공격 (공격력 ${Math.round(20*p)}%)`},
+ turtle:{t:0,f:['거북이','철갑 거북','대지 거북'],d:p=>`7초마다 체력 ${Math.round(6*p)}% 보호막`},
+ slime:{t:0,f:['펫 슬라임','킹 슬라임','젤리 신'],d:p=>`장비·알 드랍률 +${Math.round(25*p)}%`},
+ fairy:{t:1,f:['요정','빛의 요정','요정 여왕'],d:p=>`4초마다 체력 ${(3*p).toFixed(1)}% 회복`},
+ wolf:{t:1,f:['늑대','다이어울프','펜리르'],d:p=>`1.5초마다 물기 (공격력 ${Math.round(80*p)}%)`},
+ owl:{t:1,f:['부엉이','현자 부엉이','지혜의 신조'],d:p=>`경험치 +${Math.round(15*p)}%`},
+ dragon:{t:2,f:['꼬마 드래곤','화염 드래곤','태양룡'],d:p=>`2초마다 화염탄 (공격력 ${Math.round(70*p)}%)`},
+ ice:{t:2,f:['얼음 정령','서리 정령','빙결의 군주'],d:p=>`3초마다 빙결 (공격력 ${Math.round(60*p)}%) + 둔화`},
+ ghost:{t:2,f:['유령','망령','사신'],d:p=>`보스 피해 +${Math.round(10*p)}%, 2.5초마다 영혼 타격`}};
+const PTIER=[{n:'일반',c:'#94b0c2'},{n:'희귀',c:'#41a6f6'},{n:'영웅',c:'#c46cf0'}];
+const PCD={bee:.6,turtle:7,fairy:4,wolf:1.5,dragon:2,ice:3,ghost:2.5};
+const petForm=lv=>lv>=20?2:lv>=10?1:0;
+const petXpFor=lv=>10+lv*6;
+function petPow(id){const P=SAVE.pets[id];if(!P)return 0;return(1+(P.lv-1)*.08)*[1,1.6,2.5][petForm(P.lv)]}
+const inParty=id=>SAVE.party.includes(id);
+function petGainXp(id,v){const P=SAVE.pets[id];if(!P||P.lv>=30)return;const f0=petForm(P.lv);P.xp+=v;
+ while(P.lv<30&&P.xp>=petXpFor(P.lv)){P.xp-=petXpFor(P.lv);P.lv++;
+  if(G&&state==='play'){addText('PET LV'+P.lv,G.h.x-14,GY-34,'heal')}}
+ if(petForm(P.lv)>f0){if(G&&state==='play'){banner('EVOLVE!','PET','#a7f070');burst(G.h.x-14,GY-20,['#a7f070','#f4f4f4','#ffcd75'],30,70,-30);sfx('lvl')}toast('진화! '+PETS[id].f[f0]+' → '+PETS[id].f[petForm(P.lv)]);if(G)recalc()}}
+function hatch(){const r=Math.random(),t=r<.55?0:r<.88?1:2;const id=pick(Object.keys(PETS).filter(k=>PETS[k].t===t));
+ if(SAVE.pets[id]){petGainXp(id,40);toast('알 → '+PETS[id].f[petForm(SAVE.pets[id].lv)]+' 경험치 +40')}
+ else{SAVE.pets[id]={lv:1,xp:0};if(SAVE.party.length<3){SAVE.party.push(id);G.petT[id]=1}toast('새 펫 부화! ['+PTIER[t].n+'] '+PETS[id].f[0]+(inParty(id)?' (동행 중)':' — 타이틀 > 펫에서 편성'));if(G)recalc()}
+ save();sfx('lvl');burst(G.h.x,GY-12,['#f4f4f4','#ffcd75'],20,60,-30)}
 const UPG=[
  {id:'atk',label:'ATK',icon:'sword',cost:l=>8*Math.pow(1.2,l)},
  {id:'hp',label:'HP',icon:'heart',cost:l=>8*Math.pow(1.2,l)},
@@ -393,14 +450,14 @@ const biomeOf=s=>Math.floor((s-1)/10)%4;
 const needK=s=>Math.min(20,8+Math.floor(s/3));
 const xpFor=l=>Math.floor(10+l*.6);
 function newRun(){const M=SAVE.meta;
- G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,relics:[],drops:[],shield:0,guardT:8,skillAuto:true,manT:0,atkPress:0,totalKills:0,bossKills:0,time:0,
+ G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,relics:[],drops:[],petT:{},shield:0,guardT:8,skillAuto:true,manT:0,atkPress:0,totalKills:0,bossKills:0,time:0,
   up:{atk:0,hp:0,spd:0},mods:{atk:1,hp:1,spd:1,crit:0,critDmg:0,ls:0,regen:0,gold:1,xp:1,thorns:0,cdr:0,double:false,cleave:false,berserk:false,giant:false,skill:1,dr:0,wave:false,echo:0,shadow:false},
   owned:new Set(),skills:[],enemies:[],proj:[],fx:[],parts:[],coins:[],texts:[],amb:[],scroll:0,walking:true,shake:0,hitstop:0,
   pendingLv:0,lvDelay:0,banner:null,revive:M.revive>0,rerolls:M.reroll,autoBuy:false,speed:1,boss:null,bossSpawned:false,bossDelay:0,
   spawnT:1,clearT:0,deadT:0,autoT:0,goldPulse:0,press:{},
   h:{x:44,hp:1,atkT:.3,anim:0,atkAnim:0,flash:0,dead:false,dbl:0}};
  for(const k in SAVE.eq)applyEq(SAVE.eq[k],1);
- const J=SAVE.job;if(J&&J.b)for(let i=0;i<J.t;i++)JOBS[J.b].t[i].f();
+ const J=SAVE.job;if(J&&J.b)for(let i=0;i<J.t;i++)jobTier(J.b,i,J.p||[]).f();
  recalc();G.h.hp=G.st.maxHp;
  if(M.start&&G.skills.length<4){const id=pick(Object.keys(SKILLS).filter(i=>!G.skills.find(s=>s.id===i)));G.skills.push({id,lv:1,t:1})}
 }
@@ -408,7 +465,7 @@ function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0,RB=(1+(SAVE.r
  G.st={atk:12*Math.pow(1.1,G.up.atk)*m.atk*(1+M.atk*.1)*(m.berserk?2:1)*RB,sk:m.skill,dr:Math.min(.6,m.dr),
   maxHp:100*Math.pow(1.1,G.up.hp)*m.hp*(1+M.hp*.1)*(m.berserk?.7:1)*RB,
   aspd:Math.min(6,1.2*(1+G.up.spd*.05)*m.spd),crit:Math.min(.85,.05+m.crit),critDmg:1.5+m.critDmg,ls:m.ls,regen:m.regen,
-  gold:m.gold*(1+M.gold*.15)*RB,xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr+(hasR('glass')?.1:0))};if(hasR('lucky'))G.st.gold*=1.4;
+  gold:m.gold*(1+M.gold*.15)*RB,xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr+(hasR('glass')?.1:0))};if(hasR('lucky'))G.st.gold*=1.4;if(inParty('cat'))G.st.gold*=1+.1*petPow('cat');if(inParty('owl'))G.st.xp*=1+.15*petPow('owl');
  if(old&&G.st.maxHp>old)G.h.hp+=G.st.maxHp-old;G.h.hp=Math.min(G.h.hp,G.st.maxHp);
  if(G.healP){heal(G.st.maxHp*G.healP);G.healP=0}}
 
@@ -427,7 +484,7 @@ function heal(v,silent){const h=G.h;if(h.dead)return;const b=h.hp;h.hp=Math.min(
 
 // ---------- combat
 function dmgEnemy(e,base,o={}){if(e.dead)return 0;let crit=o.noCrit?false:(o.crit!==undefined?o.crit:Math.random()<G.st.crit);
- let d=base*rnd(.9,1.1);if(crit)d*=G.st.critDmg;if(G.mods.giant&&(e.boss||e.elite))d*=2;if(hasR('mask')&&G.h.hp<G.st.maxHp*.5)d*=1.4;d=Math.max(1,Math.round(d));
+ let d=base*rnd(.9,1.1);if(crit)d*=G.st.critDmg;if(G.mods.giant&&(e.boss||e.elite))d*=2;if(hasR('mask')&&G.h.hp<G.st.maxHp*.5)d*=1.4;if(e.boss&&inParty('ghost'))d*=1+.1*petPow('ghost');d=Math.max(1,Math.round(d));
  e.hp-=d;e.flash=.08;if(o.kb)e.kv=o.kb*(e.boss?.15:1);
  addText(fmt(d),e.x,etop(e)-4,crit?'crit':(o.col||'norm'));
  if(o.melee&&G.st.ls>0)heal(d*G.st.ls,true);
@@ -439,7 +496,9 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:e.boss?40:10,life:.25,max:.25,col:'#f4f4f4',sy:1});
  if(hasR('fang'))heal(G.st.maxHp*.02,true);
  if(hasR('bomb')&&!e.boss){G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:16,life:.2,max:.2,col:'#ef7d57',sy:.7});for(const o of G.enemies)if(!o.dead&&o!==e&&Math.abs(o.x-e.x)<18)dmgEnemy(o,G.st.atk*.8,{col:'fire',noCrit:true})}
- {const ch=(e.boss?1:e.elite?.3:.03)*(hasR('lucky')?2:1);if(Math.random()<ch)G.drops.push({x:e.x,y:cy,vy:-80,t:0,it:makeItem(rollIRar(e.boss),G.stage)})}
+ for(const id of SAVE.party)petGainXp(id,1);
+ {const pb=inParty('slime')?1+.25*petPow('slime'):1;const ec=(e.boss?(Object.keys(SAVE.pets).length?.3:1):e.elite?.03:0)*pb;if(Math.random()<ec)G.drops.push({x:e.x+6,y:cy,vy:-90,t:0,egg:true})}
+ {const ch=(e.boss?1:e.elite?.3:.03)*(hasR('lucky')?2:1)*(inParty('slime')?1+.25*petPow('slime'):1);if(Math.random()<ch)G.drops.push({x:e.x,y:cy,vy:-80,t:0,it:makeItem(rollIRar(e.boss),G.stage)})}
  if(e.boss){const rs=Object.keys(RELICS).filter(r=>!G.relics.includes(r));if(rs.length){const r=pick(rs);G.relics.push(r);recalc();setTimeout(()=>toast('유물 획득: '+RELICS[r].n+' — '+RELICS[r].d),900)}}
  const nc=Math.min(8,1+(e.elite?3:0)+(e.boss?7:0));for(let i=0;i<nc;i++)G.coins.push({x:e.x,y:cy,vx:rnd(-40,40),vy:rnd(-90,-40),t:rnd(-.1,0)});
  if(e.elite||e.boss)addText('+'+fmt(gold)+'G',e.x,cy-14,'gold');
@@ -466,6 +525,7 @@ function doAttack(){const h=G.h,f=front();if(!f||f.x-f.hw-h.x>18)return;h.atkAni
  if(G.mods.shadow&&!f.dead){h.shT=.15;dmgEnemy(f,G.st.atk*.6,{col:'thorn'})}
  if(G.mods.wave){h.swc=(h.swc||0)+1;if(h.swc>=3){h.swc=0;G.proj.push({k:'wave',x:h.x+10,y:GY-9,hit:[],dmg:G.st.atk*3});sfx('blade',0)}}
  sfx(crit?'crit':'hit');if(crit){G.shake=Math.max(G.shake,2);G.hitstop=Math.max(G.hitstop,.03)}}
+function petPos(i){const h=G.h,b=Math.sin(G.time*4+i*2)*2;return[{x:h.x-14,y:GY-22+b},{x:h.x-24,y:GY-6},{x:h.x-6,y:GY-32+b}][i]}
 function pickItem(it){const cur=SAVE.eq[it.slot],R=IRAR[it.rar];
  if(iScore(it)>iScore(cur)){applyEq(cur,-1);SAVE.eq[it.slot]=it;applyEq(it,1);recalc();save();toast(`장착! [${R.n}] ${it.name}`);sfx('lvl');burst(G.h.x,GY-10,[R.c,'#f4f4f4'],20,70,-30)}
  else{const sv=1+it.rar*2;SAVE.souls+=sv;save();addText('+'+sv+' SOUL',G.h.x,GY-30,'bolt');sfx('coin',0)}}
@@ -528,8 +588,17 @@ function update(dt){G.time+=dt;const h=G.h;G.manT-=dt;G.atkPress-=dt;
     for(const e of G.enemies){if(e.dead||e.bladeT>0)continue;if(Math.abs(e.x-bx)<e.hw+3&&Math.abs(ecy(e)-by)<e.h/2+5){e.bladeT=.35;dmgEnemy(e,G.st.atk*G.st.sk*(.35+.13*bl.lv),{col:'blade',kb:15});sfx('blade',.06)}}}}}
  if(hasR('guard')&&!h.dead){G.guardT-=dt;if(G.guardT<=0){G.guardT=8;G.shield=G.st.maxHp*.15}}
  for(const d of G.drops){d.t+=dt;if(d.t<.7){d.vy+=260*dt;d.y+=d.vy*dt;if(d.y>GY-3){d.y=GY-3;d.vy*=-.4}if(G.walking)d.x-=WALK*dt}
-  else{d.x+=(h.x-d.x)*Math.min(1,dt*7);d.y+=(GY-10-d.y)*Math.min(1,dt*7);if(Math.abs(d.x-h.x)<4){d.dead=true;pickItem(d.it)}}}
+  else{d.x+=(h.x-d.x)*Math.min(1,dt*7);d.y+=(GY-10-d.y)*Math.min(1,dt*7);if(Math.abs(d.x-h.x)<4){d.dead=true;if(d.egg)hatch();else pickItem(d.it)}}}
  G.drops=G.drops.filter(d=>!d.dead);
+ if(!h.dead)SAVE.party.forEach((id,i)=>{const cd=PCD[id];if(!cd)return;if(G.petT[id]===undefined)G.petT[id]=cd;G.petT[id]-=dt;if(G.petT[id]>0)return;const p=petPow(id),A=G.st.atk,pp=petPos(i),tg=targets();
+  if(id==='fairy'){G.petT[id]=cd;heal(G.st.maxHp*.03*p);burst(h.x,GY-10,['#a7f070','#73eff7'],8,30,-20);return}
+  if(id==='turtle'){G.petT[id]=cd;G.shield=Math.max(G.shield,G.st.maxHp*.06*p);return}
+  if(!tg.length){G.petT[id]=.2;return}G.petT[id]=cd;let t=tg[0];
+  if(id==='bee'){t=pick(tg);dmgEnemy(t,A*.2*p,{col:'gold',noCrit:true});G.fx.push({k:'bolt',segs:[[pp.x,pp.y,t.x,ecy(t)]],life:.08,max:.08})}
+  else if(id==='wolf'){dmgEnemy(t,A*.8*p,{kb:20});G.fx.push({k:'ring',x:t.x,y:ecy(t),r0:1,r1:6,life:.15,max:.15,col:'#f4f4f4',sy:1})}
+  else if(id==='dragon'){G.proj.push({k:'fire',x:pp.x,y:pp.y,tg:t,tx:t.x,ty:ecy(t),dmg:A*.7*p,r:9})}
+  else if(id==='ice'){dmgEnemy(t,A*.6*p,{col:'bolt'});t.slowT=2.5;G.fx.push({k:'spike',x:t.x,y:t.fly?ecy(t)+t.h/2:GY,life:.35,max:.35})}
+  else if(id==='ghost'){t=G.boss||t;dmgEnemy(t,A*.5*p,{col:'thorn'});burst(t.x,ecy(t),['#f4f4f4','#c46cf0'],6,40)}});
  if(G.walking)G.scroll+=WALK*dt;
  spawnLogic(dt);
  // enemies
@@ -591,9 +660,13 @@ function render(){const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage))
  // enemies
  const es=[...G.enemies].sort((a,b)=>b.x-a.x);
  for(const e of es)drawEnemy(e);
+ SAVE.party.forEach((id,i)=>{if(G.h.dead)return;const P=SAVE.pets[id];if(!P)return;const f=petForm(P.lv),sc=[1,1.3,1.6][f],sp=spr('p_'+id,MAPS['p_'+id]),pp=petPos(i);
+  const w=Math.round(8*sc),x=Math.round(pp.x-w/2),y=Math.round(pp.y-w/2+(i===1&&G.walking&&Math.floor(G.time*8)%2?-1:0));
+  if(f>=1){const k='pg'+id+f,gl=SC[k]||(SC[k]=sil(sp.c,f===2?'#ffcd75':'#f4f4f4'));ctx.globalAlpha=f===2?.6+.3*Math.sin(G.time*6):.35;for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(gl,x+dx,y+dy,w,w);ctx.globalAlpha=1}
+  ctx.drawImage(sp.c,x,y,w,w);if(f===2&&Math.random()<.15)G.parts.push({x:pp.x+rnd(-5,5),y:pp.y+rnd(-5,5),vx:0,vy:-10,life:.4,c:'#ffcd75',s:1,g:0})});
  drawHero();drawBl(false);
  if(G.shield>0&&!G.h.dead){const a=.5+.3*Math.sin(G.time*6);ctx.globalAlpha=a;ring(G.h.x,GY-9,12,'#73eff7',1);ctx.globalAlpha=1}
- for(const d of G.drops){const ic=icon(ISLOT[d.it.slot].icon),c=IRAR[d.it.rar].c,k='gl'+d.it.slot+d.it.rar,gl=SC[k]||(SC[k]=sil(ic.c,c));const bob=d.t>=.7?0:0,x=Math.round(d.x-4),y=Math.round(d.y-4+Math.sin(G.time*8)*1);
+ for(const d of G.drops){if(d.egg){const eg=spr('egg',MAPS.egg);ctx.drawImage(eg.c,Math.round(d.x-3),Math.round(d.y-4+Math.sin(G.time*8)));continue}const ic=icon(ISLOT[d.it.slot].icon),c=IRAR[d.it.rar].c,k='gl'+d.it.slot+d.it.rar,gl=SC[k]||(SC[k]=sil(ic.c,c));const bob=d.t>=.7?0:0,x=Math.round(d.x-4),y=Math.round(d.y-4+Math.sin(G.time*8)*1);
   ctx.globalAlpha=.7;for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(gl,x+dx,y+dy);ctx.globalAlpha=1;ctx.drawImage(ic.c,x,y);if(d.it.rar>=3&&Math.random()<.3)G.parts.push({x:d.x+rnd(-4,4),y:d.y+rnd(-4,4),vx:0,vy:-15,life:.4,c:c,s:1,g:0})}
  // projectiles
  for(const p of G.proj){if(p.k==='wave'){const x=Math.round(p.x);for(let i=-7;i<=7;i++){const o=Math.round(3-Math.sqrt(49-i*i)/2.3);ctx.fillStyle=Math.abs(i)<5?'#f4f4f4':'#73eff7';ctx.fillRect(x-o,Math.round(p.y)+i,2,1);ctx.fillStyle='#41a6f6';ctx.fillRect(x-o-2,Math.round(p.y)+i,1,1)}continue}
@@ -691,7 +764,7 @@ function drawTitle(){const t=G.time;const bob=Math.round(Math.sin(t*2)*2);
 // ---------- flow / UI
 function show(id){for(const o of document.querySelectorAll('.ov'))o.classList.remove('show');if(id)$(id).classList.add('show')}
 function goTitle(){saveRun();state='title';newRun();G.scroll=rnd(360);show('ovTitle');const r=loadRun();$('bCont').style.display=r?'':'none';$('bStart').textContent=r?'새로 시작':'▶ 사냥 시작';$('bStart').className=r?'btn':'btn gold';if(r)$('bCont').textContent='▶ 이어하기 (STAGE '+r.stage+')';
- $('titleInfo').innerHTML=`<b style="color:#73eff7">LV ${SAVE.lv}</b>${SAVE.job&&SAVE.job.b?' · '+JOBS[SAVE.job.b].t[SAVE.job.t-1].name:''}<br>`+(SAVE.rebirth?`<b style="color:#c46cf0">환생 ★${SAVE.rebirth} (+${Math.round(SAVE.rebirth*REBIRTH_B*100)}%)</b> · `:'')+`최고 기록 <b style="color:#ffcd75">STAGE ${SAVE.best}</b> · 영혼 <span class="soul">${SAVE.souls}</span>`}
+ $('titleInfo').innerHTML=`<b style="color:#73eff7">LV ${SAVE.lv}</b>${SAVE.job&&SAVE.job.b?' · '+jobName():''}<br>`+(SAVE.rebirth?`<b style="color:#c46cf0">환생 ★${SAVE.rebirth} (+${Math.round(SAVE.rebirth*REBIRTH_B*100)}%)</b> · `:'')+`최고 기록 <b style="color:#ffcd75">STAGE ${SAVE.best}</b> · 영혼 <span class="soul">${SAVE.souls}</span>`}
 function resumeRun(){const r=loadRun();if(!r){startRun();return}initAudio();newRun();
  Object.assign(G,{stage:r.stage,gold:r.gold,runGold:r.runGold,skillAuto:r.skillAuto!==false,totalKills:r.totalKills,bossKills:r.bossKills,
   up:r.up,mods:Object.assign(G.mods,r.mods),owned:new Set(r.owned),skills:r.skills.map(s=>({id:s.id,lv:s.lv,t:1})),relics:r.relics||[],revive:r.revive,rerolls:r.rerolls,
@@ -719,13 +792,13 @@ function renderCards(){const box=$('cards');box.innerHTML='';curCards.forEach((c
   el.innerHTML=`<img src="${iconURL(inf.icon)}"><div><div class="rr">${R.n}${inf.tag?' · '+inf.tag:''}</div><div class="nm">${inf.name}</div><div class="ds">${inf.d}</div></div>`;
   el.onclick=()=>chooseCard(cd);box.appendChild(el)});
  const rb=$('bReroll');rb.style.display=G.rerolls>0?'':'none';rb.textContent=`다시 뽑기 (${G.rerolls})`}
-function openJob(){state='levelup';const t=SAVE.job.t;$('cHd').textContent=(t+1)+'차 전직!';$('cSub').textContent=t===0?'직업 계열을 선택하세요':'더 강한 직업으로 각성합니다';
- const opts=t===0?Object.keys(JOBS):[SAVE.job.b];curCards=opts.map(b=>({kind:'job',b,r:t===0?1:t===1?2:3}));
- const box=$('cards');box.innerHTML='';curCards.forEach((cd,i)=>{const J=JOBS[cd.b],T=J.t[t],R=RAR[cd.r];const el=document.createElement('div');el.className='card r'+cd.r;el.style.setProperty('--rc',R.c);el.style.animationDelay=(i*.07)+'s';
+function openJob(){state='levelup';const t=SAVE.job.t;$('cHd').textContent=(t+1)+'차 전직!';$('cSub').textContent=t===0?'직업 계열을 선택하세요':'세 가지 직업 중 하나를 선택하세요';
+ curCards=t===0?Object.keys(JOBS).map(b=>({kind:'job',b,idx:0,r:1})):[0,1,2].map(i=>({kind:'job',b:SAVE.job.b,idx:i,r:t===1?2:3}));
+ const box=$('cards');box.innerHTML='';curCards.forEach((cd,i)=>{const J=JOBS[cd.b],T=t===0?J.t1:t===1?J.t2[cd.idx]:J.t3[cd.idx],R=RAR[cd.r];const el=document.createElement('div');el.className='card r'+cd.r;el.style.setProperty('--rc',R.c);el.style.animationDelay=(i*.07)+'s';
   el.innerHTML=`<img src="${iconURL(J.icon)}"><div><div class="rr">${J.n} · ${t+1}차</div><div class="nm">${T.name}</div><div class="ds">${T.d}</div></div>`;el.onclick=()=>chooseJob(cd);box.appendChild(el)});
  $('bReroll').style.display='none';show('ovCard');sfx('boss')}
-function chooseJob(cd){if(state!=='levelup')return;const t=SAVE.job.t;SAVE.job.b=cd.b;SAVE.job.t=t+1;JOBS[cd.b].t[t].f();recalc();
- banner(JOBS[cd.b].t[t].name.length>6?'CLASS UP':'CLASS UP',JOBS[cd.b].t[t].name.replace(/[^A-Z]/g,'')||'JOB '+(t+1),'#c46cf0',1.6);toast((t+1)+'차 전직: '+JOBS[cd.b].t[t].name);
+function chooseJob(cd){if(state!=='levelup')return;const t=SAVE.job.t;SAVE.job.b=cd.b;SAVE.job.p=SAVE.job.p||[];if(t>0)SAVE.job.p[t-1]=cd.idx;SAVE.job.t=t+1;const JT=jobTier(cd.b,t,SAVE.job.p);JT.f();recalc();save();
+ banner('CLASS UP','JOB '+(t+1),'#c46cf0',1.6);toast((t+1)+'차 전직: '+JT.name);
  G.fx.push({k:'pillar',life:1,max:1});burst(G.h.x,GY-10,['#c46cf0','#f4f4f4','#ffcd75'],40,90,-30);sfx('lvl');show(null);state='play';G.lvDelay=.4}
 function chooseCard(cd){if(state!=='levelup')return;if(cd.kind==='job')return chooseJob(cd);
  if(cd.kind==='stat')cd.c.f(cd.c.v[cd.r]);else if(cd.kind==='spec'){cd.c.f();G.owned.add(cd.c.id)}
@@ -735,8 +808,8 @@ function openPause(){if(state!=='play')return;state='pause';const S=G.st;
  const sk=G.skills.map(s=>SKILLS[s.id].name+' Lv'+s.lv).join(', ')||'없음';const sp=[...G.owned].map(id=>SPECC.find(c=>c.id===id).name).join(', ')||'없음';
  $('pStats').innerHTML=`<div>공격력<b>${fmt(S.atk)}</b></div><div>최대 체력<b>${fmt(S.maxHp)}</b></div><div>공격 속도<b>${S.aspd.toFixed(2)}/s</b></div><div>치명타<b>${Math.round(S.crit*100)}%</b></div>
  <div>치명 피해<b>${Math.round(S.critDmg*100)}%</b></div><div>흡혈<b>${Math.round(S.ls*100)}%</b></div><div>재생<b>${(S.regen*100).toFixed(1)}%/s</b></div><div>피해 감소<b>${Math.round(S.dr*100)}%</b></div><div>골드 배율<b>×${S.gold.toFixed(2)}</b></div>
- <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div><div style="grid-column:1/3">직업 <b style="float:none;color:#ffcd75">${SAVE.job.b?JOBS[SAVE.job.b].t[SAVE.job.t-1].name+' ('+SAVE.job.t+'차)':'없음 (Lv'+JOBLV[0]+' 전직)'}</b> · 환생 <b style="float:none;color:#c46cf0">★${SAVE.rebirth||0}</b></div>`;
- $('pStats').innerHTML+=`<div style="grid-column:1/3">유물 <b style="float:none;color:#ef7d57">${G.relics.map(r=>RELICS[r].n).join(', ')||'없음 (보스 처치 시 획득)'}</b></div><div style="grid-column:1/3">장비 <b style="float:none">${Object.keys(ISLOT).map(k=>{const it=SAVE.eq[k];return it?`<span style="color:${IRAR[it.rar].c}">${it.name}</span>`:'—'}).join(' · ')}</b></div>`;
+ <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div><div style="grid-column:1/3">직업 <b style="float:none;color:#ffcd75">${SAVE.job.b?jobName()+' ('+SAVE.job.t+'차)':'없음 (Lv'+JOBLV[0]+' 전직)'}</b> · 환생 <b style="float:none;color:#c46cf0">★${SAVE.rebirth||0}</b></div>`;
+ $('pStats').innerHTML+=`<div style="grid-column:1/3">펫 <b style="float:none;color:#a7f070">${SAVE.party.map(id=>PETS[id].f[petForm(SAVE.pets[id].lv)]+' Lv'+SAVE.pets[id].lv).join(', ')||'없음'}</b></div><div style="grid-column:1/3">유물 <b style="float:none;color:#ef7d57">${G.relics.map(r=>RELICS[r].n).join(', ')||'없음 (보스 처치 시 획득)'}</b></div><div style="grid-column:1/3">장비 <b style="float:none">${Object.keys(ISLOT).map(k=>{const it=SAVE.eq[k];return it?`<span style="color:${IRAR[it.rar].c}">${it.name}</span>`:'—'}).join(' · ')}</b></div>`;
  $('bRebirth').style.display=G.stage>=REBIRTH_ST?'':'none';show('ovPause')}
 function endRun(reborn){clearRun();state='over';const souls=Math.floor((G.stage*1.5+G.bossKills*6+G.totalKills/8)*(reborn?2:1));if(reborn)SAVE.rebirth=(SAVE.rebirth||0)+1;$('oHd').textContent=reborn?'★ 환생 완료 ★':'사냥 종료';SAVE.souls+=souls;SAVE.runs++;if(G.stage>SAVE.best)SAVE.best=G.stage;save();
  $('oStats').innerHTML=`<div>도달 스테이지<b>${G.stage}</b></div><div>최고 기록<b>${SAVE.best}</b></div><div>처치 수<b>${G.totalKills}</b></div><div>보스 처치<b>${G.bossKills}</b></div><div>레벨<b>${SAVE.lv}</b></div><div>획득 골드<b>${fmt(G.runGold)}</b></div>${reborn?`<div style="grid-column:1/3;color:#c46cf0">환생 ★${SAVE.rebirth} · 공격력·체력·골드 +${Math.round(SAVE.rebirth*REBIRTH_B*100)}% 영구 적용</div>`:''}`;
@@ -750,6 +823,16 @@ function renderShop(){$('sSoul').textContent=SAVE.souls;const L=$('shopList');L.
   b.onclick=()=>{initAudio();if(SAVE.souls>=c&&!mx){SAVE.souls-=c;SAVE.meta[m.id]++;save();sfx('buy');renderShop()}};r.appendChild(b);L.appendChild(r)})}
 
 $('bStart').onclick=startRun;$('bCont').onclick=resumeRun;$('bRetry').onclick=startRun;
+function petImg(id,dim){const s=spr('p_'+id,MAPS['p_'+id]);const k='pu'+id+(dim?'d':'');if(IU[k])return IU[k];const c=cv(32,32),g=c.getContext('2d');g.imageSmoothingEnabled=false;g.drawImage(dim?sil(s.c,'#333c57'):s.c,0,0,32,32);return IU[k]=c.toDataURL()}
+function openPet(){const L=$('petList');L.innerHTML='';const ids=Object.keys(PETS).sort((a,b)=>(SAVE.pets[b]?1:0)-(SAVE.pets[a]?1:0)||PETS[b].t-PETS[a].t);
+ for(const id of ids){const D=PETS[id],P=SAVE.pets[id],T=PTIER[D.t];const r=document.createElement('div');r.className='srow';
+  if(!P){r.innerHTML=`<img src="${petImg(id,true)}"><div><div class="nm" style="color:#566c86">???<span style="color:${T.c}">${T.n}</span></div><div class="ds">아직 만나지 못한 펫</div></div>`;L.appendChild(r);continue}
+  const f=petForm(P.lv),nx=P.lv<10?'Lv10 진화':P.lv<20?'Lv20 최종 진화':'최종 진화 완료';
+  r.innerHTML=`<img src="${petImg(id)}" style="border:var(--u) solid ${T.c}"><div><div class="nm">${D.f[f]}<span>Lv${P.lv} · ${f+1}단계 · ${T.n}</span></div><div class="ds">${D.d(petPow(id))}<br>EXP ${Math.floor(P.xp)}/${petXpFor(P.lv)} · ${nx}</div></div>`;
+  const b=document.createElement('button');const on=inParty(id);b.className='btn sm '+(on?'gold':'gray');b.textContent=on?'동행 중':'편성';
+  b.onclick=()=>{sfx('click');if(on)SAVE.party=SAVE.party.filter(x=>x!==id);else{if(SAVE.party.length>=3){toast('최대 3마리 — 먼저 한 마리를 해제하세요');return}SAVE.party.push(id)}save();openPet()};r.appendChild(b);L.appendChild(r)}
+ show('ovPet')}
+$('bPet1').onclick=()=>{initAudio();sfx('click');openPet()};$('bPetBack').onclick=()=>{sfx('click');goTitle()};
 function openEquip(){const L=$('equipList');L.innerHTML='';for(const k of Object.keys(ISLOT)){const S=ISLOT[k],it=SAVE.eq[k];const r=document.createElement('div');r.className='srow';
  r.innerHTML=it?`<img src="${iconURL(S.icon)}" style="border:var(--u) solid ${IRAR[it.rar].c}"><div><div class="nm" style="color:${IRAR[it.rar].c}">${it.name}<span>${S.n} · ${IRAR[it.rar].n}</span></div><div class="ds">${[it.main,...it.opts].map(iLine).join('<br>')}</div></div>`
   :`<img src="${iconURL(S.icon)}" style="opacity:.3"><div><div class="nm">${S.n}<span>비어 있음</span></div><div class="ds">몬스터를 사냥해 장비를 얻으세요</div></div>`;L.appendChild(r)}show('ovEquip')}
