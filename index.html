@@ -74,8 +74,8 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
   </div>
 
   <div class="ov" id="ovCard">
-    <div class="hd">LEVEL UP!</div>
-    <div class="sub">능력 하나를 선택하세요</div>
+    <div class="hd" id="cHd">LEVEL UP!</div>
+    <div class="sub" id="cSub">능력 하나를 선택하세요</div>
     <div id="cards"></div>
     <button class="btn sm gray" id="bReroll">다시 뽑기</button>
   </div>
@@ -85,10 +85,11 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <div class="stats" id="pStats"></div>
     <button class="btn gold" id="bResume">계속하기</button>
     <div class="row"><button class="btn sm gray" id="bSnd2">소리</button><button class="btn sm gray" id="bGiveup">사냥 포기</button></div>
+    <button class="btn" id="bRebirth" style="display:none;background:#9d5ad6">★ 환생하기 (영혼 ×2)</button>
   </div>
 
   <div class="ov" id="ovOver">
-    <div class="hd">사냥 종료</div>
+    <div class="hd" id="oHd">사냥 종료</div>
     <div class="stats" id="oStats"></div>
     <div class="big">획득 영혼 <span class="soul" id="oSoul">0</span></div>
     <button class="btn gold" id="bRetry">다시 도전</button>
@@ -171,7 +172,7 @@ function iconURL(name){if(IU[name])return IU[name];const s=icon(name).c,c=cv(s.w
 // ---------- bitmap font 3x5
 const FONT={'0':'111101101101111','1':'010110010010111','2':'111001111100111','3':'111001111001111','4':'101101111001001','5':'111100111001111','6':'111100111101111','7':'111001001010010','8':'111101111101111','9':'111101111001111',
 A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',K:'101101110101101',L:'100100100100111',M:'101111111101101',N:'110101101101101',O:'010101101101010',P:'110101110100100',Q:'010101101110011',R:'110101110101101',S:'011100010001110',T:'111010010010010',U:'101101101101111',V:'101101101101010',W:'101101111111101',X:'101101010101101',Y:'101101010010010',Z:'111001010100111',
-'+':'000010111010000','-':'000000111000000','!':'010010010000010','.':'000000000000010',':':'000010000010000','/':'001001010100100','%':'101001010100101',' ':'000000000000000','?':'111001010000010','>':'100010001010100'};
+'+':'000010111010000','-':'000000111000000','!':'010010010000010','.':'000000000000010',':':'000010000010000','/':'001001010100100','%':'101001010100101',' ':'000000000000000','?':'111001010000010','>':'100010001010100','*':'101010111010101'};
 const TC=new Map();
 function textCan(str,col,ol){const key=str+'|'+col+'|'+ol;let c=TC.get(key);if(c)return c;const n=str.length;c=cv(Math.max(1,n*4+1),7);const g=c.getContext('2d');
   const draw=(ox,oy,cl)=>{for(let i=0;i<n;i++){const gl=FONT[str[i]]||FONT['?'];for(let j=0;j<15;j++)if(gl[j]==='1'){const row=(j/3)|0;g.fillStyle=typeof cl==='string'?cl:cl[row];g.fillRect(1+i*4+(j%3)+ox,1+row+oy,1,1)}}};
@@ -276,13 +277,13 @@ function setMute(m){muted=m;if(master)master.gain.value=m?0:.4;const l='소리: 
 function vib(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 
 // ---------- save / meta
-let SAVE={souls:0,best:0,runs:0,mute:false,meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
+let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
 function load(){try{const s=JSON.parse(localStorage.getItem('pxhunter_v1')||'null');if(s)SAVE={...SAVE,...s,meta:{...SAVE.meta,...(s.meta||{})}}}catch(e){}}
 function save(){try{localStorage.setItem('pxhunter_v1',JSON.stringify(SAVE))}catch(e){}}
 const RUNKEY='pxhunter_run_v1';
 function saveRun(){if(!G||state==='title'||state==='over'||G.h.dead)return;try{localStorage.setItem(RUNKEY,JSON.stringify({stage:G.stage,gold:G.gold,runGold:G.runGold,level:G.level,xp:G.xp,xpNeed:G.xpNeed,
  totalKills:G.totalKills,bossKills:G.bossKills,up:G.up,mods:G.mods,owned:[...G.owned],skills:G.skills.map(s=>({id:s.id,lv:s.lv})),revive:G.revive,rerolls:G.rerolls,
- autoBuy:G.autoBuy,speed:G.speed,hpR:G.h.hp/G.st.maxHp,pendingLv:G.pendingLv,time:G.time}));save()}catch(e){}}
+ job:G.job,autoBuy:G.autoBuy,speed:G.speed,hpR:G.h.hp/G.st.maxHp,pendingLv:G.pendingLv,time:G.time}));save()}catch(e){}}
 function loadRun(){try{return JSON.parse(localStorage.getItem(RUNKEY)||'null')}catch(e){return null}}
 function clearRun(){try{localStorage.removeItem(RUNKEY)}catch(e){}}
 const META=[
@@ -327,6 +328,20 @@ const SPECC=[
  {id:'berserk',r:3,name:'광전사의 피',icon:'skull2',d:'공격력 ×2, 최대 체력 -30%',f:()=>G.mods.berserk=true},
  {id:'giant',r:3,name:'거인 학살자',icon:'star2',d:'보스·정예에게 주는 피해 ×2',f:()=>G.mods.giant=true},
  {id:'midas',r:3,name:'미다스의 손',icon:'coin',d:'골드 획득 +150%',f:()=>G.mods.gold+=1.5}];
+const JOBLV=[8,20,35],REBIRTH_ST=20,REBIRTH_B=.1;
+const JOBS={
+ war:{n:'검사 계열',icon:'sword',sw:[{b:'s',n:'d'},{b:'s',n:'d',r:'y'},{b:'y',n:'o',r:'w'}],t:[
+  {name:'검사',d:'공격력 +20%, 최대 체력 +20%',f:()=>{G.mods.atk+=.2;G.mods.hp+=.2}},
+  {name:'기사',d:'받는 피해 -20%, 치명타 피해 +40%',f:()=>{G.mods.dr+=.2;G.mods.critDmg+=.4}},
+  {name:'소드마스터',d:'기본 공격 3번마다 적을 꿰뚫는 검기 발사 (공격력 300%)',f:()=>G.mods.wave=true}]},
+ mage:{n:'마법 계열',icon:'fire',sw:[{b:'v',n:'p'},{b:'v',n:'p',r:'a'},{b:'p',n:'k',r:'a',y:'a'}],t:[
+  {name:'마법사',d:'스킬 피해 +30%, 빈 슬롯이 있으면 랜덤 스킬 1개 획득',f:()=>{G.mods.skill+=.3;if(G.skills.length<4){const ids=Object.keys(SKILLS).filter(id=>!G.skills.find(s=>s.id===id));if(ids.length)G.skills.push({id:pick(ids),lv:1,t:.3})}}},
+  {name:'원소술사',d:'스킬 쿨타임 -15%, 스킬 피해 +20%',f:()=>{G.mods.cdr+=.15;G.mods.skill+=.2}},
+  {name:'대마법사',d:'스킬 사용 시 25% 확률로 한 번 더 시전',f:()=>G.mods.echo=.25}]},
+ rogue:{n:'암살 계열',icon:'skull',sw:[{b:'g',n:'t'},{b:'e',n:'k'},{b:'k',n:'p',r:'v',y:'v'}],t:[
+  {name:'도적',d:'공격 속도 +20%, 치명타 확률 +10%',f:()=>{G.mods.spd+=.2;G.mods.crit+=.1}},
+  {name:'암살자',d:'치명타 피해 +50%, 흡혈 +3%',f:()=>{G.mods.critDmg+=.5;G.mods.ls+=.03}},
+  {name:'그림자 군주',d:'그림자 분신이 함께 공격 (추가 피해 60%)',f:()=>G.mods.shadow=true}]}};
 const UPG=[
  {id:'atk',label:'ATK',icon:'sword',cost:l=>8*Math.pow(1.2,l)},
  {id:'hp',label:'HP',icon:'heart',cost:l=>8*Math.pow(1.2,l)},
@@ -340,7 +355,7 @@ const needK=s=>Math.min(20,8+Math.floor(s/3));
 const xpFor=l=>Math.floor(4+l*4+l*l*.08);
 function newRun(){const M=SAVE.meta;
  G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,level:1,xp:0,xpNeed:xpFor(1),totalKills:0,bossKills:0,time:0,
-  up:{atk:0,hp:0,spd:0},mods:{atk:1,hp:1,spd:1,crit:0,critDmg:0,ls:0,regen:0,gold:1,xp:1,thorns:0,cdr:0,double:false,cleave:false,berserk:false,giant:false},
+  up:{atk:0,hp:0,spd:0},mods:{atk:1,hp:1,spd:1,crit:0,critDmg:0,ls:0,regen:0,gold:1,xp:1,thorns:0,cdr:0,double:false,cleave:false,berserk:false,giant:false,skill:1,dr:0,wave:false,echo:0,shadow:false},job:{b:null,t:0},
   owned:new Set(),skills:[],enemies:[],proj:[],fx:[],parts:[],coins:[],texts:[],amb:[],scroll:0,walking:true,shake:0,hitstop:0,
   pendingLv:0,lvDelay:0,banner:null,revive:M.revive>0,rerolls:M.reroll,autoBuy:false,speed:1,boss:null,bossSpawned:false,bossDelay:0,
   spawnT:1,clearT:0,deadT:0,autoT:0,goldPulse:0,press:{},
@@ -348,11 +363,11 @@ function newRun(){const M=SAVE.meta;
  recalc();G.h.hp=G.st.maxHp;
  if(M.start){const id=pick(Object.keys(SKILLS));G.skills.push({id,lv:1,t:1})}
 }
-function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0;
- G.st={atk:12*Math.pow(1.1,G.up.atk)*m.atk*(1+M.atk*.1)*(m.berserk?2:1),
-  maxHp:100*Math.pow(1.1,G.up.hp)*m.hp*(1+M.hp*.1)*(m.berserk?.7:1),
+function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0,RB=1+(SAVE.rebirth||0)*REBIRTH_B;
+ G.st={atk:12*Math.pow(1.1,G.up.atk)*m.atk*(1+M.atk*.1)*(m.berserk?2:1)*RB,sk:m.skill,dr:Math.min(.6,m.dr),
+  maxHp:100*Math.pow(1.1,G.up.hp)*m.hp*(1+M.hp*.1)*(m.berserk?.7:1)*RB,
   aspd:Math.min(6,1.2*(1+G.up.spd*.05)*m.spd),crit:Math.min(.85,.05+m.crit),critDmg:1.5+m.critDmg,ls:m.ls,regen:m.regen,
-  gold:m.gold*(1+M.gold*.15),xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr)};
+  gold:m.gold*(1+M.gold*.15)*RB,xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr)};
  if(old&&G.st.maxHp>old)G.h.hp+=G.st.maxHp-old;G.h.hp=Math.min(G.h.hp,G.st.maxHp);
  if(G.healP){heal(G.st.maxHp*G.healP);G.healP=0}}
 
@@ -389,7 +404,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  else if(!e.minion){G.stageKills++;if(!isBoss(G.stage)&&G.stageKills>=needK(G.stage)&&G.clearT<=0)G.clearT=.6}}
 function gainXp(v){G.xp+=v;while(G.xp>=G.xpNeed){G.xp-=G.xpNeed;G.level++;G.xpNeed=xpFor(G.level);G.pendingLv++;G.lvDelay=.45;
   G.fx.push({k:'pillar',life:.7,max:.7});burst(G.h.x,GY-10,['#ffcd75','#f4f4f4','#73eff7'],24,70,-30);sfx('lvl');heal(G.st.maxHp*.1)}}
-function hurtHero(d,src){const h=G.h;if(h.dead)return;d=Math.max(1,Math.round(d));h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
+function hurtHero(d,src){const h=G.h;if(h.dead)return;d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
  if(G.st.thorns>0&&src&&!src.dead)dmgEnemy(src,d*G.st.thorns,{noCrit:true,col:'thorn'});
  if(h.hp<=0){if(G.revive){G.revive=false;h.hp=G.st.maxHp*.5;banner('REVIVE','불사조의 깃털','#ef7d57');G.fx.push({k:'pillar',life:1,max:1});
    burst(h.x,GY-10,['#ef7d57','#ffcd75','#b13e53'],50,110,-40);for(const e of G.enemies)if(!e.dead)e.kv=140;G.shake=6;sfx('lvl')}
@@ -402,9 +417,11 @@ function explode(x,y,r,dmg,kind){for(const e of G.enemies){if(e.dead)continue;co
 function doAttack(){const h=G.h,f=front();if(!f||f.x-f.hw-h.x>18)return;h.atkAnim=.15;const crit=Math.random()<G.st.crit;
  G.fx.push({k:'slash',life:.14,max:.14,crit,flip:h.flipS=!h.flipS});
  const tg=G.mods.cleave?G.enemies.filter(e=>!e.dead&&e.x-e.hw-h.x<=28):[f];for(const e of tg)dmgEnemy(e,G.st.atk,{crit,melee:true,kb:45});
+ if(G.mods.shadow&&!f.dead){h.shT=.15;dmgEnemy(f,G.st.atk*.6,{col:'thorn'})}
+ if(G.mods.wave){h.swc=(h.swc||0)+1;if(h.swc>=3){h.swc=0;G.proj.push({k:'wave',x:h.x+10,y:GY-9,hit:[],dmg:G.st.atk*3});sfx('blade',0)}}
  sfx(crit?'crit':'hit');if(crit){G.shake=Math.max(G.shake,2);G.hitstop=Math.max(G.hitstop,.03)}}
 function targets(){return G.enemies.filter(e=>!e.dead&&e.x<W-4).sort((a,b)=>a.x-b.x)}
-function cast(sk){const tg=targets();if(!tg.length)return false;const A=G.st.atk,l=sk.lv,h=G.h;
+function cast(sk){const tg=targets();if(!tg.length)return false;const A=G.st.atk*G.st.sk,l=sk.lv,h=G.h;
  if(sk.id==='fire'){const n=l>=3?2:1;for(let i=0;i<n;i++){const t=i?pick(tg):tg[0];G.proj.push({k:'fire',x:h.x+6,y:GY-12,tg:t,tx:t.x,ty:ecy(t),dmg:A*(1.4+.45*l),r:12+2*l})}sfx('fire')}
  else if(sk.id==='bolt'){const n=2+l;let pts=[{x:h.x+4,y:GY-14}],hit=[];let cur=tg[0];
   for(let i=0;i<n&&cur;i++){hit.push(cur);pts.push({x:cur.x,y:ecy(cur)});let nb=null,bd=1e9;for(const e of tg){if(hit.includes(e))continue;const d=Math.abs(e.x-cur.x);if(d<bd&&d<70){bd=d;nb=e}}cur=nb}
@@ -438,7 +455,7 @@ function nextStage(){const pb=biomeOf(G.stage);G.stage++;G.stageKills=0;G.spawne
  if(nb!==pb){G.flashScr=.35;G.amb=[];toast('새 지역: '+BIOMES[nb].kr);}
  if(isBoss(G.stage)){banner('BOSS','STAGE '+G.stage,'#ff4d6a',2);G.bossDelay=1.6;sfx('warn',0)}
  else banner('STAGE '+G.stage,BIOMES[nb].id,'#ffcd75',1.3);
- if(G.stage>SAVE.best){SAVE.best=G.stage}}
+ if(G.stage>SAVE.best){SAVE.best=G.stage}if(G.stage===REBIRTH_ST)setTimeout(()=>toast('환생 가능! 일시정지(II) 메뉴에서 환생할 수 있어요'),1800)}
 
 // ---------- update
 function update(dt){G.time+=dt;const h=G.h;
@@ -453,9 +470,9 @@ function update(dt){G.time+=dt;const h=G.h;
   if(h.dbl>0){h.dbl-=dt;if(h.dbl<=0)doAttack()}
   const f=front();G.walking=!f||(f.x-f.hw-h.x>(f.ranged?14:40));
   if(f&&f.x-f.hw-h.x<=16&&h.atkT<=0){h.atkT=1/G.st.aspd;doAttack();if(G.mods.double)h.dbl=.09}
-  for(const sk of G.skills){if(sk.id==='blade')continue;sk.t-=dt;if(sk.t<=0){if(cast(sk))sk.t=SKILLS[sk.id].cd(sk.lv)*(1-G.st.cdr);else sk.t=0}}
+  for(const sk of G.skills){if(sk.id==='blade')continue;sk.t-=dt;if(sk.t<=0){if(cast(sk)){sk.t=SKILLS[sk.id].cd(sk.lv)*(1-G.st.cdr);if(G.mods.echo&&Math.random()<G.mods.echo)sk.echo=.3}else sk.t=0}if(sk.echo>0){sk.echo-=dt;if(sk.echo<=0){sk.echo=0;if(cast(sk))addText('ECHO',G.h.x,GY-34,'bolt')}}}
   const bl=G.skills.find(s=>s.id==='blade');if(bl){const n=bl.lv+1;for(let i=0;i<n;i++){const a=G.time*4.2+i*Math.PI*2/n;const bx=h.x+Math.cos(a)*22,by=GY-9+Math.sin(a)*9;
-    for(const e of G.enemies){if(e.dead||e.bladeT>0)continue;if(Math.abs(e.x-bx)<e.hw+3&&Math.abs(ecy(e)-by)<e.h/2+5){e.bladeT=.35;dmgEnemy(e,G.st.atk*(.35+.13*bl.lv),{col:'blade',kb:15});sfx('blade',.06)}}}}}
+    for(const e of G.enemies){if(e.dead||e.bladeT>0)continue;if(Math.abs(e.x-bx)<e.hw+3&&Math.abs(ecy(e)-by)<e.h/2+5){e.bladeT=.35;dmgEnemy(e,G.st.atk*G.st.sk*(.35+.13*bl.lv),{col:'blade',kb:15});sfx('blade',.06)}}}}}
  if(G.walking)G.scroll+=WALK*dt;
  spawnLogic(dt);
  // enemies
@@ -478,6 +495,7 @@ function update(dt){G.time+=dt;const h=G.h;
    if(d<=v+2){explode(p.tx,p.ty,p.r,p.dmg,'fire');p.dead=true}else{p.x+=dx/d*v;p.y+=dy/d*v}
    if(Math.random()<.8)G.parts.push({x:p.x,y:p.y,vx:rnd(-10,10),vy:rnd(-15,5),life:.25,c:pick(['#ffcd75','#ef7d57','#b13e53']),s:1,g:0})}
   else if(p.k==='arrow'){p.x+=p.vx*dt;if(p.x<=G.h.x+4){p.dead=true;hurtHero(p.dmg,p.src)}}
+  else if(p.k==='wave'){p.x+=210*dt;for(const e of G.enemies){if(e.dead||p.hit.includes(e))continue;if(Math.abs(e.x-p.x)<e.hw+3){p.hit.push(e);dmgEnemy(e,p.dmg,{col:'blade',kb:30});burst(e.x,ecy(e),['#f4f4f4','#73eff7'],5,50)}}if(p.x>W+10)p.dead=true}
   else if(p.k==='meteor'){p.x+=p.vx*dt;p.y+=p.vy*dt;for(let i=0;i<3;i++)G.parts.push({x:p.x+rnd(-3,3),y:p.y+rnd(-3,3),vx:rnd(10,40),vy:rnd(-40,-10),life:rnd(.2,.5),c:pick(['#ffcd75','#ef7d57','#b13e53','#566c86']),s:2,g:0});
    if(p.y>=p.ty){p.dead=true;explode(p.x,p.ty,p.r,p.dmg,'meteor')}}}
  G.proj=G.proj.filter(p=>!p.dead);
@@ -518,7 +536,8 @@ function render(){const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage))
  for(const e of es)drawEnemy(e);
  drawHero();drawBl(false);
  // projectiles
- for(const p of G.proj){if(p.k==='fire'){disc(ctx,p.x,p.y,2,'#ef7d57');ctx.fillStyle='#ffcd75';ctx.fillRect(Math.round(p.x)-1,Math.round(p.y)-1,2,2)}
+ for(const p of G.proj){if(p.k==='wave'){const x=Math.round(p.x);for(let i=-7;i<=7;i++){const o=Math.round(3-Math.sqrt(49-i*i)/2.3);ctx.fillStyle=Math.abs(i)<5?'#f4f4f4':'#73eff7';ctx.fillRect(x-o,Math.round(p.y)+i,2,1);ctx.fillStyle='#41a6f6';ctx.fillRect(x-o-2,Math.round(p.y)+i,1,1)}continue}
+  if(p.k==='fire'){disc(ctx,p.x,p.y,2,'#ef7d57');ctx.fillStyle='#ffcd75';ctx.fillRect(Math.round(p.x)-1,Math.round(p.y)-1,2,2)}
   else if(p.k==='arrow'){ctx.fillStyle='#94b0c2';ctx.fillRect(Math.round(p.x),Math.round(p.y),6,1);ctx.fillStyle='#f4f4f4';ctx.fillRect(Math.round(p.x)-1,Math.round(p.y),1,1);ctx.fillStyle='#b13e53';ctx.fillRect(Math.round(p.x)+5,Math.round(p.y)-1,1,3)}
   else if(p.k==='meteor'){disc(ctx,p.x,p.y,5,'#ef7d57');disc(ctx,p.x,p.y,4,'#566c86');ctx.fillStyle='#94b0c2';ctx.fillRect(Math.round(p.x)-2,Math.round(p.y)-2,2,1)}}
  for(const f of G.fx)drawFx(f);
@@ -533,8 +552,9 @@ function render(){const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage))
  if(state==='title')drawTitle();else drawHUD();
  if(G.banner&&state!=='title')drawBanner()}
 function drawHero(){const h=G.h;let key='hero_a';if(h.atkAnim>0)key='hero_x';else if(G.walking&&!h.dead)key=Math.floor(h.anim*7)%2?'hero_b':'hero_a';
- const s=spr(key,MAPS[key]);let bob=(!G.walking&&h.atkAnim<=0&&Math.floor(h.anim*2)%2)?1:0;let x=Math.round(h.x-8+(h.atkAnim>0?2:0)),y=GY-16+bob;
+ const jb=G.job&&G.job.b?G.job.b+G.job.t:'';const s=spr(key+jb,MAPS[key],jb?JOBS[G.job.b].sw[G.job.t-1]:null);let bob=(!G.walking&&h.atkAnim<=0&&Math.floor(h.anim*2)%2)?1:0;let x=Math.round(h.x-8+(h.atkAnim>0?2:0)),y=GY-16+bob;
  if(h.dead){ctx.globalAlpha=Math.max(0,1-G.deadT*.6);y+=Math.min(6,G.deadT*10)}
+ if(G.mods.shadow&&!h.dead){const sh=SC['shd'+key+jb]||(SC['shd'+key+jb]=sil(s.c,'#3a1f5c'));ctx.globalAlpha=.55;ctx.drawImage(sh,x-7+(h.shT>0?6:0),y-1);ctx.globalAlpha=1;if(h.shT>0)h.shT-=1/60}
  ctx.drawImage(h.flash>0?s.wh:s.c,x,y);ctx.globalAlpha=1;
  if(G.revive&&!h.dead&&Math.floor(G.time*2)%4===0){ctx.fillStyle='#ef7d57';ctx.fillRect(x+4,y-2,1,1)}}
 function drawEnemy(e){const fr=e.type==='bat'?Math.floor(e.t*8)%2:0;const s=eSpr(e.type,fr,e.boss);
@@ -558,7 +578,7 @@ function drawFx(f){const p=1-f.life/f.max,h=G.h;
 function drawHUD(){const h=G.h,S=G.st;
  // top
  ctx.fillStyle='rgba(26,28,44,.85)';ctx.fillRect(0,0,W,22);ctx.fillStyle='#333c57';ctx.fillRect(0,22,W,1);
- txt('STAGE '+G.stage,3,2,isBoss(G.stage)?'#ff4d6a':'#f4f4f4');
+ const sw=txt('STAGE '+G.stage,3,2,isBoss(G.stage)?'#ff4d6a':'#f4f4f4');if(SAVE.rebirth)txt('*'+SAVE.rebirth,6+sw,2,'#c46cf0');
  const gw=txt(fmt(G.gold),W-3,2,G.goldPulse>0?'#fff7c2':'#ffcd75',1,'r');const ci=icon('coin');ctx.drawImage(ci.c,W-3-gw-8,2);
  txt(BIOMES[biomeOf(G.stage)].id,W/2+6,2,'#566c86',1,'c',null);
  if(isBoss(G.stage)&&G.boss){const b=G.boss;ctx.fillStyle='#1a1c2c';ctx.fillRect(3,11,W-6,8);ctx.fillStyle='#5d275d';ctx.fillRect(4,12,W-8,6);ctx.fillStyle='#ff4d6a';ctx.fillRect(4,12,Math.ceil((W-8)*b.hp/b.maxHp),6);ctx.fillStyle='#ffffff55';ctx.fillRect(4,12,Math.ceil((W-8)*b.hp/b.maxHp),1);txt(b.name,W/2,12,'#f4f4f4',1,'c')}
@@ -603,11 +623,11 @@ function drawTitle(){const t=G.time;const bob=Math.round(Math.sin(t*2)*2);
 // ---------- flow / UI
 function show(id){for(const o of document.querySelectorAll('.ov'))o.classList.remove('show');if(id)$(id).classList.add('show')}
 function goTitle(){saveRun();state='title';newRun();G.scroll=rnd(360);show('ovTitle');const r=loadRun();$('bCont').style.display=r?'':'none';$('bStart').textContent=r?'새로 시작':'▶ 사냥 시작';$('bStart').className=r?'btn':'btn gold';if(r)$('bCont').textContent='▶ 이어하기 (STAGE '+r.stage+')';
- $('titleInfo').innerHTML=`최고 기록 <b style="color:#ffcd75">STAGE ${SAVE.best}</b> · 영혼 <span class="soul">${SAVE.souls}</span>`}
+ $('titleInfo').innerHTML=(SAVE.rebirth?`<b style="color:#c46cf0">환생 ★${SAVE.rebirth} (+${Math.round(SAVE.rebirth*REBIRTH_B*100)}%)</b> · `:'')+`최고 기록 <b style="color:#ffcd75">STAGE ${SAVE.best}</b> · 영혼 <span class="soul">${SAVE.souls}</span>`}
 function resumeRun(){const r=loadRun();if(!r){startRun();return}initAudio();newRun();
  Object.assign(G,{stage:r.stage,gold:r.gold,runGold:r.runGold,level:r.level,xp:r.xp,xpNeed:r.xpNeed,totalKills:r.totalKills,bossKills:r.bossKills,
   up:r.up,mods:Object.assign(G.mods,r.mods),owned:new Set(r.owned),skills:r.skills.map(s=>({id:s.id,lv:s.lv,t:1})),revive:r.revive,rerolls:r.rerolls,
-  autoBuy:r.autoBuy,speed:r.speed||1,pendingLv:r.pendingLv||0,lvDelay:.8,time:r.time||0});
+  job:r.job||{b:null,t:0},autoBuy:r.autoBuy,speed:r.speed||1,pendingLv:r.pendingLv||0,lvDelay:.8,time:r.time||0});
  G.st=null;recalc();G.h.hp=Math.max(1,G.st.maxHp*clamp(r.hpR,.05,1));
  if(isBoss(G.stage))G.bossDelay=1.6;state='play';show(null);banner('STAGE '+G.stage,'CONTINUE','#a7f070');sfx('lvl')}
 function startRun(){clearRun();initAudio();newRun();state='play';show(null);banner('STAGE 1',BIOMES[0].id);sfx('lvl');
@@ -625,13 +645,21 @@ function genCards(){const L=SAVE.meta.luck;const wts=[Math.max(20,60-L*5),28+L*2
  return out}
 function cardInfo(cd){if(cd.kind==='stat')return{icon:cd.c.icon,name:cd.c.name,d:cd.c.d(cd.c.v[cd.r])};if(cd.kind==='spec')return{icon:cd.c.icon,name:cd.c.name,d:cd.c.d};
  const D=SKILLS[cd.id];if(cd.isNew)return{icon:D.icon,name:D.name,d:D.desc,tag:'NEW 스킬'};const s=G.skills.find(x=>x.id===cd.id);return{icon:D.icon,name:D.name+' +'+cd.up,d:`Lv${s.lv} → Lv${s.lv+cd.up} · ${D.up}`,tag:'스킬 강화'}}
-function openCards(){state='levelup';curCards=genCards();renderCards();show('ovCard')}
+function openCards(){state='levelup';$('cHd').textContent='LEVEL UP!';$('cSub').textContent='능력 하나를 선택하세요';curCards=genCards();renderCards();show('ovCard')}
 function renderCards(){const box=$('cards');box.innerHTML='';curCards.forEach((cd,i)=>{const inf=cardInfo(cd),R=RAR[cd.r];const el=document.createElement('div');
   el.className='card r'+cd.r;el.style.setProperty('--rc',R.c);el.style.animationDelay=(i*.07)+'s';
   el.innerHTML=`<img src="${iconURL(inf.icon)}"><div><div class="rr">${R.n}${inf.tag?' · '+inf.tag:''}</div><div class="nm">${inf.name}</div><div class="ds">${inf.d}</div></div>`;
   el.onclick=()=>chooseCard(cd);box.appendChild(el)});
  const rb=$('bReroll');rb.style.display=G.rerolls>0?'':'none';rb.textContent=`다시 뽑기 (${G.rerolls})`}
-function chooseCard(cd){if(state!=='levelup')return;
+function openJob(){state='levelup';const t=G.job.t;$('cHd').textContent=(t+1)+'차 전직!';$('cSub').textContent=t===0?'직업 계열을 선택하세요':'더 강한 직업으로 각성합니다';
+ const opts=t===0?Object.keys(JOBS):[G.job.b];curCards=opts.map(b=>({kind:'job',b,r:t===0?1:t===1?2:3}));
+ const box=$('cards');box.innerHTML='';curCards.forEach((cd,i)=>{const J=JOBS[cd.b],T=J.t[t],R=RAR[cd.r];const el=document.createElement('div');el.className='card r'+cd.r;el.style.setProperty('--rc',R.c);el.style.animationDelay=(i*.07)+'s';
+  el.innerHTML=`<img src="${iconURL(J.icon)}"><div><div class="rr">${J.n} · ${t+1}차</div><div class="nm">${T.name}</div><div class="ds">${T.d}</div></div>`;el.onclick=()=>chooseJob(cd);box.appendChild(el)});
+ $('bReroll').style.display='none';show('ovCard');sfx('boss')}
+function chooseJob(cd){if(state!=='levelup')return;const t=G.job.t;G.job.b=cd.b;G.job.t=t+1;JOBS[cd.b].t[t].f();recalc();
+ banner(JOBS[cd.b].t[t].name.length>6?'CLASS UP':'CLASS UP',JOBS[cd.b].t[t].name.replace(/[^A-Z]/g,'')||'JOB '+(t+1),'#c46cf0',1.6);toast((t+1)+'차 전직: '+JOBS[cd.b].t[t].name);
+ G.fx.push({k:'pillar',life:1,max:1});burst(G.h.x,GY-10,['#c46cf0','#f4f4f4','#ffcd75'],40,90,-30);sfx('lvl');show(null);state='play';G.lvDelay=.4}
+function chooseCard(cd){if(state!=='levelup')return;if(cd.kind==='job')return chooseJob(cd);
  if(cd.kind==='stat')cd.c.f(cd.c.v[cd.r]);else if(cd.kind==='spec'){cd.c.f();G.owned.add(cd.c.id)}
  else if(cd.isNew)G.skills.push({id:cd.id,lv:1,t:.3});else{const s=G.skills.find(x=>x.id===cd.id);s.lv+=cd.up}
  recalc();G.pendingLv--;sfx('buy');show(null);state='play';if(G.pendingLv>0)G.lvDelay=.25}
@@ -639,9 +667,10 @@ function openPause(){if(state!=='play')return;state='pause';const S=G.st;
  const sk=G.skills.map(s=>SKILLS[s.id].name+' Lv'+s.lv).join(', ')||'없음';const sp=[...G.owned].map(id=>SPECC.find(c=>c.id===id).name).join(', ')||'없음';
  $('pStats').innerHTML=`<div>공격력<b>${fmt(S.atk)}</b></div><div>최대 체력<b>${fmt(S.maxHp)}</b></div><div>공격 속도<b>${S.aspd.toFixed(2)}/s</b></div><div>치명타<b>${Math.round(S.crit*100)}%</b></div>
  <div>치명 피해<b>${Math.round(S.critDmg*100)}%</b></div><div>흡혈<b>${Math.round(S.ls*100)}%</b></div><div>재생<b>${(S.regen*100).toFixed(1)}%/s</b></div><div>골드 배율<b>×${S.gold.toFixed(2)}</b></div>
- <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div>`;show('ovPause')}
-function endRun(){clearRun();state='over';const souls=Math.floor(G.stage*1.5+G.bossKills*6+G.totalKills/8);SAVE.souls+=souls;SAVE.runs++;if(G.stage>SAVE.best)SAVE.best=G.stage;save();
- $('oStats').innerHTML=`<div>도달 스테이지<b>${G.stage}</b></div><div>최고 기록<b>${SAVE.best}</b></div><div>처치 수<b>${G.totalKills}</b></div><div>보스 처치<b>${G.bossKills}</b></div><div>레벨<b>${G.level}</b></div><div>획득 골드<b>${fmt(G.runGold)}</b></div>`;
+ <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div><div style="grid-column:1/3">직업 <b style="float:none;color:#ffcd75">${G.job.b?JOBS[G.job.b].t[G.job.t-1].name+' ('+G.job.t+'차)':'없음 (Lv'+JOBLV[0]+' 전직)'}</b> · 환생 <b style="float:none;color:#c46cf0">★${SAVE.rebirth||0}</b></div>`;
+ $('bRebirth').style.display=G.stage>=REBIRTH_ST?'':'none';show('ovPause')}
+function endRun(reborn){clearRun();state='over';const souls=Math.floor((G.stage*1.5+G.bossKills*6+G.totalKills/8)*(reborn?2:1));if(reborn)SAVE.rebirth=(SAVE.rebirth||0)+1;$('oHd').textContent=reborn?'★ 환생 완료 ★':'사냥 종료';SAVE.souls+=souls;SAVE.runs++;if(G.stage>SAVE.best)SAVE.best=G.stage;save();
+ $('oStats').innerHTML=`<div>도달 스테이지<b>${G.stage}</b></div><div>최고 기록<b>${SAVE.best}</b></div><div>처치 수<b>${G.totalKills}</b></div><div>보스 처치<b>${G.bossKills}</b></div><div>레벨<b>${G.level}</b></div><div>획득 골드<b>${fmt(G.runGold)}</b></div>${reborn?`<div style="grid-column:1/3;color:#c46cf0">환생 ★${SAVE.rebirth} · 공격력·체력·골드 +${Math.round(SAVE.rebirth*REBIRTH_B*100)}% 영구 적용</div>`:''}`;
  $('oSoul').textContent='+'+souls;show('ovOver')}
 let shopBack='ovTitle';
 function openShop(from){shopBack=from;renderShop();show('ovShop')}
@@ -656,6 +685,7 @@ $('bShop1').onclick=()=>{initAudio();sfx('click');openShop('ovTitle')};$('bShop2
 $('bShopBack').onclick=()=>{sfx('click');if(shopBack==='ovTitle')goTitle();else show('ovOver')};
 $('bHome').onclick=()=>{sfx('click');goTitle()};
 $('bResume').onclick=()=>{sfx('click');show(null);state='play'};
+$('bRebirth').onclick=()=>{show(null);state='play';sfx('lvl');endRun(true)};
 $('bGiveup').onclick=()=>{show(null);state='play';G.h.dead=true;G.deadT=1.8;endRun()};
 $('bReroll').onclick=()=>{if(G.rerolls>0){G.rerolls--;sfx('click');curCards=genCards();renderCards()}};
 $('bSnd1').onclick=()=>{initAudio();setMute(!muted)};$('bSnd2').onclick=()=>setMute(!muted);
@@ -672,7 +702,7 @@ addEventListener('resize',resize);resize();
 let last=performance.now();
 function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
  try{if(state==='play'){if(G.hitstop>0)G.hitstop-=dt;else for(let i=0;i<G.speed;i++)update(dt);
-   if(G.pendingLv>0&&G.lvDelay<=0&&!G.h.dead&&state==='play')openCards()}
+   if(G.lvDelay<=0&&!G.h.dead&&state==='play'){if(G.job.t<3&&G.level>=JOBLV[G.job.t])openJob();else if(G.pendingLv>0)openCards()}}
   else if(state==='title'){G.scroll+=WALK*dt;G.h.anim+=dt;G.time+=dt;G.walking=true;updParts(dt)}
   render()}catch(err){console.error(err)}
  requestAnimationFrame(frame)}
