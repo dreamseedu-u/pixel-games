@@ -594,7 +594,7 @@ function iLine(o){return INAME[o.k]+' +'+(o.v*100).toFixed(o.v<.01?2:1)+'%'}
 function rollIRar(boss){const w=boss?[0,45,35,15,5]:[62,25,9,3,1];let t=w.reduce((a,b)=>a+b),r=Math.random()*t;for(let i=0;i<5;i++)if((r-=w[i])<0)return i;return 0}
 const RELICS={
  bomb:{n:'폭발의 핵',icon:'meteor',d:'적 처치 시 주변 폭발 (공격력 80%)'},
- guard:{n:'수호의 방패',icon:'shield',d:'8초마다 최대 체력 15% 보호막'},
+ guard:{n:'수호의 부적',icon:'shield',d:'받는 피해 -15%'},
  fang:{n:'흡혈귀의 송곳니',icon:'drop',d:'적 처치 시 체력 2% 회복'},
  glass:{n:'시간의 모래시계',icon:'gem',d:'스킬 쿨타임 -10%'},
  mask:{n:'분노의 가면',icon:'skull2',d:'체력 50% 이하일 때 주는 피해 +40%'},
@@ -605,7 +605,7 @@ const hasR=id=>G&&G.relics&&G.relics.includes(id);
 const PETS={
  cat:{t:0,f:['황금 고양이','부자 고양이','재물신 고양이'],d:p=>`골드 +${Math.round(10*p)}%`},
  bee:{t:0,f:['꿀벌','말벌','여왕벌'],d:p=>`0.6초마다 침 공격 (공격력 ${Math.round(20*p)}%)`},
- turtle:{t:0,f:['거북이','철갑 거북','대지 거북'],d:p=>`7초마다 체력 ${Math.round(6*p)}% 보호막`},
+ turtle:{t:0,f:['거북이','철갑 거북','대지 거북'],d:p=>`7초마다 주변 적을 밀어내고 3초간 받는 피해 -${Math.round(Math.min(30,8*p))}%`},
  slime:{t:0,f:['펫 슬라임','킹 슬라임','젤리 신'],d:p=>`장비·알 드랍률 +${Math.round(25*p)}%`},
  fairy:{t:1,f:['요정','빛의 요정','요정 여왕'],d:p=>`4초마다 체력 ${(3*p).toFixed(1)}% 회복`},
  wolf:{t:1,f:['늑대','다이어울프','펜리르'],d:p=>`1.5초마다 물기 (공격력 ${Math.round(80*p)}%)`},
@@ -708,7 +708,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  else if(!e.minion){G.stageKills++;if(!isBoss(G.stage)&&G.stageKills>=needK(G.stage)&&G.clearT<=0)G.clearT=.6}}
 function gainXp(v){SAVE.xp+=v;while(SAVE.xp>=xpFor(SAVE.lv)){SAVE.xp-=xpFor(SAVE.lv);SAVE.lv++;recalc();G.lvDelay=Math.max(G.lvDelay,.45);addText('LV'+SAVE.lv,G.h.x,GY-34,'heal');
   G.fx.push({k:'pillar',life:.7,max:.7});burst(G.h.x,GY-10,['#ffcd75','#f4f4f4','#73eff7'],24,70,-30);sfx('lvl');heal(G.st.maxHp*.1)}}
-function hurtHero(d,src){const h=G.h;if(h.dead)return;if(G.inv>0){if(Math.random()<.3)addText('IMMUNE',h.x,GY-26,'gold');return}d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));if(hasR('frostH')&&src&&!src.dead)src.slowT=2;if(G.shield>0){const a=Math.min(G.shield,d);G.shield-=a;d-=a;if(d<=0){addText('BLOCK',h.x,GY-24,'bolt');return}}h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
+function hurtHero(d,src){const h=G.h;if(h.dead)return;if(hasR('guard'))d*=.85;if(G.drBuffT>0)d*=1-G.drBuff;if(G.inv>0){if(Math.random()<.3)addText('IMMUNE',h.x,GY-26,'gold');return}d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));if(hasR('frostH')&&src&&!src.dead)src.slowT=2;if(G.shield>0){const a=Math.min(G.shield,d);G.shield-=a;d-=a;if(d<=0){addText('BLOCK',h.x,GY-24,'bolt');return}}h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
  if(G.thornT>0&&src&&!src.dead)dmgEnemy(src,d,{noCrit:true,col:'thorn',sk:null});if(G.st.thorns>0&&src&&!src.dead)dmgEnemy(src,d*G.st.thorns,{noCrit:true,col:'thorn'});
  if(h.hp<=0){if(G.revive>0){G.revive--;h.hp=G.st.maxHp*.5;banner('REVIVE','불사조의 깃털','#ef7d57');G.fx.push({k:'pillar',life:1,max:1});
    burst(h.x,GY-10,['#ef7d57','#ffcd75','#b13e53'],50,110,-40);for(const e of G.enemies)if(!e.dead)e.kv=140;G.shake=6;sfx('lvl')}
@@ -820,13 +820,13 @@ function update(dt){G.time+=dt;const h=G.h;G.manT-=dt;G.atkPress-=dt;
   if(h.dbl>0){h.dbl-=dt;if(h.dbl<=0)doAttack()}
   const f=front();G.walking=!f||(f.x-f.hw-h.x>(f.ranged?14:40));
   if(f&&f.x-f.hw-h.x<=16&&h.atkT<=0){h.atkT=1/G.st.aspd;doAttack();if(G.mods.double)h.dbl=.09}
-  G.buffT-=dt;G.thornT=(G.thornT||0)-dt;for(const n of treeActives()){if(G.ct[n.id]===undefined)G.ct[n.id]=1;G.ct[n.id]-=dt;if(G.ct[n.id]<=0){if(classCast(n.id,tLv(n.id)))G.ct[n.id]=n.cd(tLv(n.id))*(1-G.st.cdr);else G.ct[n.id]=.2}}
+  G.buffT-=dt;G.drBuffT=(G.drBuffT||0)-dt;G.thornT=(G.thornT||0)-dt;for(const n of treeActives()){if(G.ct[n.id]===undefined)G.ct[n.id]=1;G.ct[n.id]-=dt;if(G.ct[n.id]<=0){if(classCast(n.id,tLv(n.id)))G.ct[n.id]=n.cd(tLv(n.id))*(1-G.st.cdr);else G.ct[n.id]=.2}}
   for(const m of G.minions){m.t-=dt;m.atk-=dt;m.an-=dt;const tx=h.x+16+m.i*8;m.x+=(tx-m.x)*Math.min(1,dt*4);if(m.atk<=0){const f=front();if(f&&f.x-f.hw-m.x<26){m.atk=1;m.an=.15;dmgEnemy(f,G.st.atk*G.st.sk*m.p*(G.st.minion||1),{col:'thorn',noCrit:true})}else m.atk=.2}}
   G.minions=G.minions.filter(m=>m.t>0);if(G.mods.summon&&!h.dead){G.sumT=(G.sumT===undefined?2:G.sumT)-dt;if(G.sumT<=0&&targets().length){G.sumT=10;summon(1+G.mods.minionN,.7*(G.mods.minion||1));sfx('zap',.2)}}
   for(const sk of G.skills){if(sk.id==='blade')continue;sk.t-=dt;if(sk.t<=0&&!G.skillAuto)sk.t=0;else if(sk.t<=0){if(cast(sk)){sk.t=SKILLS[sk.id].cd(sk.lv)*(1-G.st.cdr);if(evS(sk)>=1&&!sk.echo)sk.echo=.28;if((G.mods.echo+(G.st.echo||0))&&Math.random()<G.mods.echo+(G.st.echo||0))sk.echo=.3}else sk.t=0}if(sk.echo>0){sk.echo-=dt;if(sk.echo<=0){sk.echo=0;if(cast(sk))addText('ECHO',G.h.x,GY-34,'bolt')}}}
   const bl=G.skills.find(s=>s.id==='blade');if(bl){const BU=isUlt(bl),BE=Math.min(5,evS(bl)),n=BU?12:BE?5+BE:bl.lv+1,BR=BU?30:22+BE*1.5;if(BU){bl.wv=(bl.wv||0)-dt;if(bl.wv<=0){bl.wv=1.4;G.proj.push({k:'wave',x:h.x+10,y:GY-9,hit:[],dmg:G.st.atk*G.st.sk*2})}}for(let i=0;i<n;i++){const a=G.time*(4.2+BE*.3)+i*Math.PI*2/n;const bx=h.x+Math.cos(a)*BR,by=GY-9+Math.sin(a)*(BR*.41);
     for(const e of G.enemies){if(e.dead||e.bladeT>0)continue;if(Math.abs(e.x-bx)<e.hw+3&&Math.abs(ecy(e)-by)<e.h/2+5){e.bladeT=.35;if(BE>=5)e.slowT=Math.max(e.slowT,1);dmgEnemy(e,G.st.atk*G.st.sk*(1+.2*BE)*(BU?2:1)*(.35+.13*bl.lv),{col:'blade',kb:15,sk:bl});sfx('blade',.06)}}}}}
- if(hasR('guard')&&!h.dead){G.guardT-=dt;if(G.guardT<=0){G.guardT=8;G.shield=G.st.maxHp*.15}}
+ 
  for(const d of G.drops){d.t+=dt;if(d.t<.7){d.vy+=260*dt;d.y+=d.vy*dt;if(d.y>GY-3){d.y=GY-3;d.vy*=-.4}if(G.walking)d.x-=WALK*dt}
   else{d.x+=(h.x-d.x)*Math.min(1,dt*7);d.y+=(GY-10-d.y)*Math.min(1,dt*7);if(Math.abs(d.x-h.x)<4){d.dead=true;if(d.egg)hatch();else pickItem(d.it)}}}
  G.drops=G.drops.filter(d=>!d.dead);G.inv-=dt;
@@ -836,8 +836,8 @@ function update(dt){G.time+=dt;const h=G.h;G.manT-=dt;G.atkPress-=dt;
   if(z.t<=0&&z.boom){explode(z.x,z.y,z.r+6,z.boom,'meteor');if(z.stun)for(const e of G.enemies)if(!e.dead&&Math.abs(e.x-z.x)<z.r+8)e.stunT=Math.max(e.stunT||0,1)}}
  G.zones=G.zones.filter(z=>z.t>0);for(const c of G.corpses){c.t+=dt;if(G.walking)c.x-=WALK*dt}G.corpses=G.corpses.filter(c=>c.t<.5);
  if(!h.dead)SAVE.party.forEach((id,i)=>{const PS=petStar((SAVE.pets[id]||{}).lv||1),cd0=PCD[id];if(!cd0)return;const cd=cd0*(PS>=1?.8:1);if(G.petT[id]===undefined)G.petT[id]=cd;G.petT[id]-=dt;if(G.petT[id]>0)return;const p=petPow(id),A=G.st.atk,pp=petPos(i),tg=targets();if(PS>=2&&tg.length&&!G['pe'+id]){G['pe'+id]=1;setTimeout(()=>{if(G&&state==='play')G.petT[id]=0;},180)}else G['pe'+id]=0;
-  if(id==='fairy'){G.petT[id]=cd;heal(G.st.maxHp*.03*p);if(PS>=3)G.shield=Math.max(G.shield,G.st.maxHp*.03*p);if(PS>=4)G.inv=Math.max(G.inv,.5);burst(h.x,GY-10,['#a7f070','#73eff7'],8,30,-20);return}
-  if(id==='turtle'){G.petT[id]=cd;G.shield=Math.max(G.shield,G.st.maxHp*.06*p);if(PS>=3)for(const e of G.enemies)if(!e.dead&&e.x-G.h.x<30)e.kv=80;if(PS>=4)G.thornT=2;return}
+  if(id==='fairy'){G.petT[id]=cd;heal(G.st.maxHp*.03*p);if(PS>=3)heal(G.st.maxHp*.02*p,true);if(PS>=4)G.inv=Math.max(G.inv,.5);burst(h.x,GY-10,['#a7f070','#73eff7'],8,30,-20);return}
+  if(id==='turtle'){G.petT[id]=cd;G.drBuffT=3;G.drBuff=Math.min(.3,.08*p);for(const e of G.enemies)if(!e.dead&&e.x-G.h.x<(PS>=3?45:30))e.kv=80;G.fx.push({k:'ring',x:h.x,y:GY-4,r0:3,r1:PS>=3?30:20,life:.3,max:.3,col:'#38b764',sy:.5});if(PS>=4)G.thornT=2;return}
   if(!tg.length){G.petT[id]=.2;return}G.petT[id]=cd;let t=tg[0];
   if(id==='bee'){t=pick(tg);petHit(t,A*.2*p,PS,'poison',{col:'gold',noCrit:true});G.fx.push({k:'bolt',segs:[[pp.x,pp.y,t.x,ecy(t)]],life:.08,max:.08})}
   else if(id==='wolf'){petHit(t,A*.8*p,PS,'bleed',{kb:20});G.fx.push({k:'ring',x:t.x,y:ecy(t),r0:1,r1:6,life:.15,max:.15,col:'#f4f4f4',sy:1})}
