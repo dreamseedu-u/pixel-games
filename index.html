@@ -165,9 +165,10 @@ wind:["k...k....","ck..ck...",".ck..ck..","..ck..ck.","...ck..ck","..ck..ck.",".
 gem:["..kkkkk..",".kawaaak.","kawaaaaak","kaaaaaack",".kaaacck.","..kaack..","...kck...","....k....","........."],
 shield:[".kkkkkkk.","kssssssdk","kswssssdk","ksssssddk","ksssssddk",".ksssddk.",".kssddk..","..ksdk...","...kk...."],
 skull:[".kkkkkk..","kwwwwwwk.","kwwwwwwwk","kwkkwkkwk","kwkkwkkwk","kwwwkwwwk",".kwwwwwk.",".kwkwkwk.","..kkkkk.."],
+armor:[".kk...kk.","kbbk.kbbk","kbbbkbbbk","kbwbbbbbk",".kbbbbbk.",".kbbybbk.",".kbbbbbk.",".kbbbbbk.","..kkkkk.."],
 shur:["..w..",".sws.","wwkww",".sws.","..w.."]
 };
-const ICONS={sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],fire:['fire'],bolt:['bolt'],blade:['blade'],frost:['frost'],
+const ICONS={armor:['armor'],sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],fire:['fire'],bolt:['bolt'],blade:['blade'],frost:['frost'],
 meteor:['meteor'],star:['star'],drop:['drop'],plus:['plus'],gem:['gem'],shield:['shield'],skull:['skull'],
 sword2:['sword',{s:'y',w:'w'}],wind2:['wind',{c:'r'}],skull2:['skull',{w:'r'}],star2:['star',{y:'o',w:'y'}],coin2:['coin',{y:'a',o:'c'}]};
 
@@ -356,14 +357,15 @@ const JOBS={
 const IRAR=[{n:'일반',c:'#94b0c2'},{n:'희귀',c:'#41a6f6'},{n:'영웅',c:'#c46cf0'},{n:'전설',c:'#ffcd75'},{n:'신화',c:'#ff4d6a'}];
 const IRM=[1,1.6,2.5,4,6.5];
 const ISLOT={weapon:{n:'무기',icon:'sword',main:'atk',names:['녹슨 검','강철 검','룬 블레이드','용살검','태초의 검']},
- armor:{n:'갑옷',icon:'shield',main:'hp',names:['가죽 갑옷','사슬 갑옷','미스릴 갑옷','용린 갑옷','성광의 갑주']},
+ armor:{n:'갑옷',icon:'armor',main:'hp',names:['가죽 갑옷','사슬 갑옷','미스릴 갑옷','용린 갑옷','성광의 갑주']},
+ shield:{n:'방패',icon:'shield',main:'dr',names:['나무 방패','철 방패','기사의 방패','용비늘 방패','이지스']},
  acc:{n:'장신구',icon:'gem',main:'critd',names:['구리 반지','은 반지','마나 목걸이','불사조 부적','별의 심장']}};
-const IBASE={atk:.08,hp:.1,spd:.03,crit:.015,critd:.1,ls:.005,regen:.002,gold:.08,skill:.06,cdr:.02};
-const IKEY={atk:'atk',hp:'hp',spd:'spd',crit:'crit',critd:'critDmg',ls:'ls',regen:'regen',gold:'gold',skill:'skill',cdr:'cdr'};
-const INAME={atk:'공격력',hp:'체력',spd:'공격속도',crit:'치명타',critd:'치명피해',ls:'흡혈',regen:'초당 재생',gold:'골드',skill:'스킬피해',cdr:'쿨타임 감소'};
+const IBASE={dr:.03,atk:.08,hp:.1,spd:.03,crit:.015,critd:.1,ls:.005,regen:.002,gold:.08,skill:.06,cdr:.02};
+const IKEY={dr:'dr',atk:'atk',hp:'hp',spd:'spd',crit:'crit',critd:'critDmg',ls:'ls',regen:'regen',gold:'gold',skill:'skill',cdr:'cdr'};
+const INAME={dr:'받는 피해 감소',atk:'공격력',hp:'체력',spd:'공격속도',crit:'치명타',critd:'치명피해',ls:'흡혈',regen:'초당 재생',gold:'골드',skill:'스킬피해',cdr:'쿨타임 감소'};
 function makeItem(rar,stage){const slot=pick(Object.keys(ISLOT)),S=ISLOT[slot],sf=1+(stage-1)*.03,rm=IRM[rar];
- const it={slot,rar,name:S.names[rar],main:{k:S.main,v:+(IBASE[S.main]*rm*sf).toFixed(4)},opts:[]};
- const pool=Object.keys(IBASE).filter(k=>k!==S.main);for(let i=0;i<Math.min(rar,3);i++){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];const fixed=['crit','ls','regen','cdr'].includes(k);
+ const it={slot,rar,name:S.names[rar],main:{k:S.main,v:+(IBASE[S.main]*rm*(S.main==='dr'?1:sf)).toFixed(4)},opts:[]};
+ const pool=Object.keys(IBASE).filter(k=>k!==S.main);for(let i=0;i<Math.min(rar,3);i++){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];const fixed=['crit','ls','regen','cdr','dr'].includes(k);
   it.opts.push({k,v:+(IBASE[k]*.5*rm*(fixed?1:sf)*rnd(.7,1.3)).toFixed(4)})}return it}
 function iScore(it){if(!it)return 0;let sc=it.main.v/IBASE[it.main.k];for(const o of it.opts)sc+=o.v/IBASE[o.k]*.6;return sc}
 function applyEq(it,sg){if(!it)return;for(const o of[it.main,...it.opts])G.mods[IKEY[o.k]]+=o.v*sg}
@@ -732,7 +734,7 @@ function chooseCard(cd){if(state!=='levelup')return;if(cd.kind==='job')return ch
 function openPause(){if(state!=='play')return;state='pause';const S=G.st;
  const sk=G.skills.map(s=>SKILLS[s.id].name+' Lv'+s.lv).join(', ')||'없음';const sp=[...G.owned].map(id=>SPECC.find(c=>c.id===id).name).join(', ')||'없음';
  $('pStats').innerHTML=`<div>공격력<b>${fmt(S.atk)}</b></div><div>최대 체력<b>${fmt(S.maxHp)}</b></div><div>공격 속도<b>${S.aspd.toFixed(2)}/s</b></div><div>치명타<b>${Math.round(S.crit*100)}%</b></div>
- <div>치명 피해<b>${Math.round(S.critDmg*100)}%</b></div><div>흡혈<b>${Math.round(S.ls*100)}%</b></div><div>재생<b>${(S.regen*100).toFixed(1)}%/s</b></div><div>골드 배율<b>×${S.gold.toFixed(2)}</b></div>
+ <div>치명 피해<b>${Math.round(S.critDmg*100)}%</b></div><div>흡혈<b>${Math.round(S.ls*100)}%</b></div><div>재생<b>${(S.regen*100).toFixed(1)}%/s</b></div><div>피해 감소<b>${Math.round(S.dr*100)}%</b></div><div>골드 배율<b>×${S.gold.toFixed(2)}</b></div>
  <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div><div style="grid-column:1/3">직업 <b style="float:none;color:#ffcd75">${SAVE.job.b?JOBS[SAVE.job.b].t[SAVE.job.t-1].name+' ('+SAVE.job.t+'차)':'없음 (Lv'+JOBLV[0]+' 전직)'}</b> · 환생 <b style="float:none;color:#c46cf0">★${SAVE.rebirth||0}</b></div>`;
  $('pStats').innerHTML+=`<div style="grid-column:1/3">유물 <b style="float:none;color:#ef7d57">${G.relics.map(r=>RELICS[r].n).join(', ')||'없음 (보스 처치 시 획득)'}</b></div><div style="grid-column:1/3">장비 <b style="float:none">${Object.keys(ISLOT).map(k=>{const it=SAVE.eq[k];return it?`<span style="color:${IRAR[it.rar].c}">${it.name}</span>`:'—'}).join(' · ')}</b></div>`;
  $('bRebirth').style.display=G.stage>=REBIRTH_ST?'':'none';show('ovPause')}
