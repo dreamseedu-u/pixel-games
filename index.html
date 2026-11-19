@@ -121,6 +121,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     </div>
     <button class="btn sm" id="bInstall" style="background:#38b764">📲 홈 화면에 바로가기 추가</button>
     <button class="btn sm" id="bWipe" style="background:#b13e53">⚠ 전체 초기화</button>
+    <button class="btn sm" id="bExit" style="display:none;background:#566c86">🏠 나가기 (타이틀로 · 진행 저장)</button>
     <button class="btn gray" id="bSetBack">돌아가기</button>
   </div>
 
@@ -274,6 +275,7 @@ si_sdag:["................", "............kk..", "...........kwk..", "..........
 si_quake:["................", "......k..k......", ".....kmk.kmk....", "......k...k.....", "..k.........k...", ".kmk.......kmk..", "..k...........k.", "kkkkkkkkkkkkkkkk", "kmmmmkmmmmkmmmmk", "kmMMkkmMMMkkmMMk", "kmMk.kmMMk.kkmMk", "kMMk..kMk...kMMk", "kMk....k.....kMk", "kkk..........kkk", "................", "................"],
 si_hole:["................", ".....kkkkkk.....", "...kkvvvvvvkk...", "..kvvpppppvvvk..", ".kvpppkkkpppvk..", ".kvppkkkkkppvvk.", "kvvpkkkkkkkpvvk.", "kvppkkkwkkkppvk.", "kvvpkkkkkkkpvvk.", ".kvppkkkkkppvk..", ".kvvpppkkpppvk..", "..kvvvpppppvk...", "...kkvvvvvvkk...", ".....kkkkkk.....", "................", "................"],
 si_guard:["................", "..k.kkkkkkkk.k..", ".kwkyyyyyyyykwk.", "kwwkywyyyyyokwwk", "kwwkyyyyyyyokwwk", ".kwkyyywwyyok.k.", "..kkyywwwwyok...", "...kyyywwyyok...", "...kyyyyyyook...", "....kyyyyook....", ".....kyyook.....", "......kyok......", ".......kk.......", "................", "................", "................"],
+gear:["...kk....", ".k.kwk.k.", "kwkkwkkwk", ".kwwwwwk.", "kkwwkwwkk", ".kwwwwwk.", "kwkkwkkwk", ".k.kwk.k.", "...kk...."],
 shur:["..w..",".sws.","wwkww",".sws.","..w.."]
 };
 const ICONS={fire:['si_fire'],bolt:['si_bolt'],blade:['si_blade'],frost:['si_frost'],meteor:['si_meteor'],poison:['si_poison'],holy:['si_holy'],tornado:['si_tornado'],sdag:['si_sdag'],quake:['si_quake'],hole:['si_hole'],guard:['si_guard'],old_poison:['skull',{w:'l'}],old_holy:['star',{y:'w',w:'y'}],old_tornado:['wind',{c:'a'}],old_sdag:['sword',{s:'v',w:'s',y:'p'}],old_quake:['meteor',{d:'m',s:'o'}],old_hole:['gem',{a:'v',w:'p',c:'k'}],old_guard:['shield',{s:'y',w:'w',d:'o'}],basic:['sword',{s:'a',w:'w'}],armor:['armor'],sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],old_fire:['fire'],old_bolt:['bolt'],old_blade:['blade'],old_frost:['frost'],
@@ -1036,7 +1038,7 @@ function drawHUD(){const h=G.h,S=G.st;
  // top
  ctx.fillStyle='rgba(26,28,44,.85)';ctx.fillRect(0,0,W,22);ctx.fillStyle='#333c57';ctx.fillRect(0,22,W,1);
  const sw=txt('STAGE '+G.stage,3,2,isBoss(G.stage)?'#ff4d6a':'#f4f4f4');if(SAVE.rebirth)txt('*'+SAVE.rebirth,6+sw,2,'#c46cf0');
- const gw=txt(fmt(G.gold),W-3,2,G.goldPulse>0?'#fff7c2':'#ffcd75',1,'r');const ci=icon('coin');ctx.drawImage(ci.c,W-3-gw-8,2);
+ {const gs=spr('gear_ic',MAPS.gear,{w:'s'});ctx.fillStyle='#566c86';ctx.fillRect(W-15,0,13,11);ctx.fillStyle='#1a1c2c';ctx.fillRect(W-14,.5,11,10);ctx.drawImage(gs.c,W-13,1,9,9)}const gw=txt(fmt(G.gold),W-18,2,G.goldPulse>0?'#fff7c2':'#ffcd75',1,'r');const ci=icon('coin');ctx.drawImage(ci.c,W-18-gw-8,2);
  txt(BIOMES[biomeOf(G.stage)].id,W/2+6,2,'#566c86',1,'c',null);
  if(isBoss(G.stage)&&G.boss){const b=G.boss;ctx.fillStyle='#1a1c2c';ctx.fillRect(3,11,W-6,8);ctx.fillStyle='#5d275d';ctx.fillRect(4,12,W-8,6);ctx.fillStyle='#ff4d6a';ctx.fillRect(4,12,Math.ceil((W-8)*b.hp/b.maxHp),6);ctx.fillStyle='#ffffff55';ctx.fillRect(4,12,Math.ceil((W-8)*b.hp/b.maxHp),1);txt(b.name,W/2,12,'#f4f4f4',1,'c')}
  else{const pr=isBoss(G.stage)?0:Math.min(1,G.stageKills/needK(G.stage));ctx.fillStyle='#1a1c2c';ctx.fillRect(3,12,W-6,6);ctx.fillStyle='#333c57';ctx.fillRect(4,13,W-8,4);ctx.fillStyle='#a7f070';ctx.fillRect(4,13,Math.round((W-8)*pr),4);ctx.fillStyle='#38b764';ctx.fillRect(4,16,Math.round((W-8)*pr),1);
@@ -1051,7 +1053,7 @@ function drawHUD(){const h=G.h,S=G.st;
  ctx.fillStyle='#333c57';ctx.fillRect(4,262,128,3);ctx.fillStyle='#73eff7';ctx.fillRect(4,262,Math.round(128*(SAVE.lv>=LVMAX?1:SAVE.xp/xpFor(SAVE.lv))),3);
  txt('LV'+SAVE.lv,156,256,'#73eff7',1,'c');
  // skill slots
- BTN.length=0;
+ BTN.length=0;BTN.push({x:W-20,y:0,w:20,h:16,act:()=>openSetGame()});
  for(let i=0;i<4;i++){const x=4+i*22,y=268,sk=G.skills[i];ctx.fillStyle='#333c57';ctx.fillRect(x,y,20,20);ctx.fillStyle='#1a1c2c';ctx.fillRect(x+1,y+1,18,18);
   BTN.push({x,y,w:20,h:20,act:()=>useSkill(i)});
   if(sk){const D=SKILLS[sk.id];const SI=skIcon(sk);if(!G.skillAuto&&D.cd&&sk.t<=0){ctx.fillStyle=Math.floor(G.time*6)%2?'#ffcd75':'#ef7d57';ctx.fillRect(x,y,20,20);ctx.fillStyle='#1a1c2c';ctx.fillRect(x+1,y+1,18,18)}if(evT(evS(sk))>=2)glow(x+10,y+10,16,evT(evS(sk))>=3?rbw():'#c46cf0',.35);{const HI=skIconHD(sk);ctx.drawImage(HI.c,x+1.5,y+1.5,17,17)}if(D.cd){const cd=D.cd(sk.lv)*(1-S.cdr),r=clamp(sk.t/cd,0,1);if(r>0){ctx.fillStyle='rgba(10,10,20,.65)';ctx.fillRect(x+1,y+1,18,Math.ceil(18*r))}}
@@ -1188,12 +1190,14 @@ if($('bTree2'))$('bTree2').onclick=()=>{sfx('click');openTree('pause')};
 $('bTreeBack').onclick=()=>{sfx('click');if(treeFrom==='pause'){openPause2()}else goTitle()};
 $('bTreeReset').onclick=()=>{SAVE.tree={};save();sfx('click');if(G&&G.st)recalc();openTree();toast('스킬 포인트를 모두 돌려받았어요')};
 function openPause2(){state='play';openPause()}
-$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';setMute(muted);crispLbl();vibLbl();show('ovSet')};function ask(msg,yes,back){$('askMsg').innerHTML=msg;show('ovAsk');$('askYes').onclick=()=>{sfx('click');yes()};$('askNo').onclick=()=>{sfx('click');show(back)}}
+$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';$('bExit').style.display='none';setMute(muted);crispLbl();vibLbl();show('ovSet')};function ask(msg,yes,back){$('askMsg').innerHTML=msg;show('ovAsk');$('askYes').onclick=()=>{sfx('click');yes()};$('askNo').onclick=()=>{sfx('click');show(back)}}
 $('bWipe').onclick=()=>{sfx('click');ask('모든 기록을 지우고 <b style="color:#ffcd75">Lv1부터 다시 시작</b>할까요?<br><br><span style="color:#94b0c2;font-size:.85em">레벨·전직·환생·영혼·장비·펫·최고 기록이 모두 지워지며<br>되돌릴 수 없습니다</span>',()=>{
  const keep={mute:SAVE.mute,noVib:SAVE.noVib,crisp:SAVE.crisp};try{localStorage.removeItem('pxhunter_v1');localStorage.removeItem(RUNKEY)}catch(e){}
  SAVE=Object.assign(SAVE0(),keep);save();goTitle();toast('모든 기록을 초기화했어요. Lv1부터 다시 시작합니다')},'ovSet')};
-let setFrom='title';$('bSetBack').onclick=()=>{sfx('click');if(setFrom==='pause'){show('ovPause')}else goTitle()};
-$('bSet2').onclick=()=>{sfx('click');setFrom='pause';crispLbl();vibLbl();setMute(muted);show('ovSet')};
+let setFrom='title';$('bSetBack').onclick=()=>{sfx('click');if(setFrom==='pause'){show('ovPause')}else if(setFrom==='game'){show(null);state='play'}else goTitle()};
+function openSetGame(){if(state!=='play')return;sfx('click');state='pause';setFrom='game';crispLbl();vibLbl();setMute(muted);$('bExit').style.display='';show('ovSet')}
+$('bExit').onclick=()=>{sfx('click');saveRun();goTitle();toast('진행 상황을 저장했어요 — 이어하기로 계속할 수 있어요')};
+$('bSet2').onclick=()=>{sfx('click');setFrom='pause';$('bExit').style.display='';crispLbl();vibLbl();setMute(muted);show('ovSet')};
 $('bPet1').onclick=()=>{initAudio();sfx('click');openPet()};$('bPetBack').onclick=()=>{sfx('click');goTitle()};
 function openEquip(){const L=$('equipList');L.innerHTML='';for(const k of Object.keys(ISLOT)){const S=ISLOT[k],it=SAVE.eq[k];const r=document.createElement('div');r.className='srow';
  r.innerHTML=it?`<img src="${iconURL(S.icon)}" style="border:var(--u) solid ${IRAR[it.rar].c}"><div><div class="nm" style="color:${IRAR[it.rar].c}">${it.name}<span>${S.n} · ${IRAR[it.rar].n}</span></div><div class="ds">${[it.main,...it.opts].map(iLine).join('<br>')}</div></div>`
