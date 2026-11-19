@@ -148,7 +148,8 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
 
   <div class="ov" id="ovShop">
     <div class="hd">영혼 강화</div>
-    <div class="sub">보유 영혼 <span class="soul big" id="sSoul">0</span><br>영구 강화는 모든 사냥에 적용됩니다</div>
+    <div class="sub">보유 영혼 <span class="soul big" id="sSoul">0</span></div>
+    <div id="shopTier" style="width:100%"></div>
     <div class="shoplist" id="shopList"></div>
     <button class="btn" id="bShopBack">돌아가기</button>
   </div>
@@ -381,7 +382,7 @@ function setMute(m){muted=m;if(master)master.gain.value=m?0:.4;const l='소리: 
 function vib(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 
 // ---------- save / meta
-let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,lv:1,xp:0,job:{b:null,t:0},eq:{},pets:{},party:[],meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
+let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,metaT:0,lv:1,xp:0,job:{b:null,t:0},eq:{},pets:{},party:[],meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
 function load(){try{const s=JSON.parse(localStorage.getItem('pxhunter_v1')||'null');if(s)SAVE={...SAVE,...s,meta:{...SAVE.meta,...(s.meta||{})}}}catch(e){}}
 function save(){try{localStorage.setItem('pxhunter_v1',JSON.stringify(SAVE))}catch(e){}}
 const RUNKEY='pxhunter_run_v1';
@@ -390,14 +391,18 @@ function saveRun(){if(!G||state==='title'||state==='over'||G.h.dead)return;try{l
  autoBuy:G.autoBuy,speed:G.speed,hpR:G.h.hp/G.st.maxHp,pendingLv:G.pendingLv,time:G.time}));save()}catch(e){}}
 function loadRun(){try{return JSON.parse(localStorage.getItem(RUNKEY)||'null')}catch(e){return null}}
 function clearRun(){try{localStorage.removeItem(RUNKEY)}catch(e){}}
+const META_T=['영혼','정령','신성','태초','무한'];
 const META=[
- {id:'atk',name:'영혼의 검',icon:'sword',max:20,cost:l=>Math.floor(8*Math.pow(1.32,l)),d:l=>`시작 공격력 +${l*10}%`},
- {id:'hp',name:'영혼의 심장',icon:'heart',max:20,cost:l=>Math.floor(8*Math.pow(1.32,l)),d:l=>`시작 체력 +${l*10}%`},
- {id:'gold',name:'황금의 손',icon:'coin',max:10,cost:l=>Math.floor(12*Math.pow(1.4,l)),d:l=>`골드 획득 +${l*15}%`},
- {id:'luck',name:'행운의 별',icon:'star',max:8,cost:l=>Math.floor(18*Math.pow(1.45,l)),d:l=>`높은 등급 카드 확률 증가 (Lv${l})`},
- {id:'reroll',name:'운명 재설정',icon:'gem',max:3,cost:l=>[25,70,180][l],d:l=>`레벨업 다시 뽑기 ${l}회`},
- {id:'start',name:'비전 각성',icon:'bolt',max:1,cost:()=>50,d:l=>l?'랜덤 스킬 1개 보유 시작':'랜덤 스킬 1개를 들고 시작'},
- {id:'revive',name:'불사조의 깃털',icon:'fire',max:1,cost:()=>120,d:l=>l?'사망 시 1회 부활':'사망 시 체력 50%로 1회 부활'}];
+ {id:'atk',name:'영혼의 검',icon:'sword',max:20,grow:20,cost:l=>Math.floor(8*Math.pow(1.25,l)),d:l=>`시작 공격력 +${l*10}%`},
+ {id:'hp',name:'영혼의 심장',icon:'heart',max:20,grow:20,cost:l=>Math.floor(8*Math.pow(1.25,l)),d:l=>`시작 체력 +${l*10}%`},
+ {id:'gold',name:'황금의 손',icon:'coin',max:10,grow:10,cost:l=>Math.floor(12*Math.pow(1.3,l)),d:l=>`골드 획득 +${l*15}%`},
+ {id:'luck',name:'행운의 별',icon:'star',max:8,grow:4,cost:l=>Math.floor(18*Math.pow(1.35,l)),d:l=>`높은 등급 카드 확률 증가 (Lv${l})`},
+ {id:'reroll',name:'운명 재설정',icon:'gem',max:3,grow:2,cost:l=>Math.floor(25*Math.pow(2.2,l)),d:l=>`카드 다시 뽑기 ${l}회`},
+ {id:'start',name:'비전 각성',icon:'bolt',max:1,grow:1,cap:4,cost:l=>Math.floor(50*Math.pow(3,l)),d:l=>`랜덤 스킬 ${Math.max(1,l)}개를 들고 시작`},
+ {id:'revive',name:'불사조의 깃털',icon:'fire',max:1,grow:1,cap:5,cost:l=>Math.floor(120*Math.pow(2.5,l)),d:l=>`사망 시 체력 50%로 ${Math.max(1,l)}회 부활`}];
+const metaT=()=>Math.min(SAVE.metaT||0,META_T.length-1);
+const metaMax=m=>Math.min(m.cap||1e9,m.max+m.grow*metaT());
+const metaAllMax=()=>META.every(m=>SAVE.meta[m.id]>=metaMax(m));
 
 // ---------- game data
 const ETYPES={
@@ -537,15 +542,15 @@ function newRun(){const M=SAVE.meta;
  G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,relics:[],drops:[],petT:{},shield:0,guardT:8,skillAuto:true,manT:0,atkPress:0,totalKills:0,bossKills:0,time:0,
   up:{atk:0,hp:0,spd:0},mods:{atk:1,hp:1,spd:1,crit:0,critDmg:0,ls:0,regen:0,gold:1,xp:1,thorns:0,cdr:0,double:false,cleave:false,berserk:false,giant:false,skill:1,dr:0,wave:false,echo:0,shadow:false},
   owned:new Set(),skills:[],enemies:[],proj:[],fx:[],parts:[],coins:[],texts:[],amb:[],scroll:0,walking:true,shake:0,hitstop:0,
-  pendingLv:0,lvDelay:0,banner:null,revive:M.revive>0,rerolls:M.reroll,autoBuy:false,speed:1,boss:null,bossSpawned:false,bossDelay:0,
+  pendingLv:0,lvDelay:0,banner:null,revive:M.revive,rerolls:M.reroll,autoBuy:false,speed:1,boss:null,bossSpawned:false,bossDelay:0,
   spawnT:1,clearT:0,deadT:0,autoT:0,goldPulse:0,press:{},
   h:{x:44,hp:1,atkT:.3,anim:0,atkAnim:0,flash:0,dead:false,dbl:0}};
  for(const k in SAVE.eq)applyEq(SAVE.eq[k],1);
  const J=SAVE.job;if(J&&J.b)for(let i=0;i<J.t;i++)jobTier(J.b,i,J.p||[]).f();
  recalc();G.h.hp=G.st.maxHp;
- if(M.start&&G.skills.length<4){const id=pick(Object.keys(SKILLS).filter(i=>!G.skills.find(s=>s.id===i)));G.skills.push({id,lv:1,t:1})}
+ for(let k=0;k<(M.start||0)&&G.skills.length<4;k++){const id=pick(Object.keys(SKILLS).filter(i=>!G.skills.find(s=>s.id===i)));G.skills.push({id,lv:1,t:1})}
 }
-function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0,RB=(1+(SAVE.rebirth||0)*REBIRTH_B)*(1+(SAVE.lv-1)*.005);
+function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0,RB=(1+(SAVE.rebirth||0)*REBIRTH_B)*(1+(SAVE.lv-1)*.005)*(1+metaT()*.1);
  G.st={atk:12*Math.pow(1.1,G.up.atk)*m.atk*(1+M.atk*.1)*(m.berserk?2:1)*RB,sk:m.skill,dr:Math.min(.6,m.dr),
   maxHp:100*Math.pow(1.1,G.up.hp)*m.hp*(1+M.hp*.1)*(m.berserk?.7:1)*RB,
   aspd:Math.min(6,1.2*(1+G.up.spd*.05)*m.spd),crit:Math.min(.85,.05+m.crit),critDmg:1.5+m.critDmg,ls:m.ls,regen:m.regen,
@@ -594,7 +599,7 @@ function gainXp(v){SAVE.xp+=v;while(SAVE.xp>=xpFor(SAVE.lv)){SAVE.xp-=xpFor(SAVE
   G.fx.push({k:'pillar',life:.7,max:.7});burst(G.h.x,GY-10,['#ffcd75','#f4f4f4','#73eff7'],24,70,-30);sfx('lvl');heal(G.st.maxHp*.1)}}
 function hurtHero(d,src){const h=G.h;if(h.dead)return;d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));if(hasR('frostH')&&src&&!src.dead)src.slowT=2;if(G.shield>0){const a=Math.min(G.shield,d);G.shield-=a;d-=a;if(d<=0){addText('BLOCK',h.x,GY-24,'bolt');return}}h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
  if(G.st.thorns>0&&src&&!src.dead)dmgEnemy(src,d*G.st.thorns,{noCrit:true,col:'thorn'});
- if(h.hp<=0){if(G.revive){G.revive=false;h.hp=G.st.maxHp*.5;banner('REVIVE','불사조의 깃털','#ef7d57');G.fx.push({k:'pillar',life:1,max:1});
+ if(h.hp<=0){if(G.revive>0){G.revive--;h.hp=G.st.maxHp*.5;banner('REVIVE','불사조의 깃털','#ef7d57');G.fx.push({k:'pillar',life:1,max:1});
    burst(h.x,GY-10,['#ef7d57','#ffcd75','#b13e53'],50,110,-40);for(const e of G.enemies)if(!e.dead)e.kv=140;G.shake=6;sfx('lvl')}
   else{h.dead=true;h.hp=0;G.deadT=0;sfx('die');vib(200);G.shake=6;burst(h.x,GY-8,['#3b5dc9','#94b0c2','#b13e53'],30,80)}}}
 function explode(x,y,r,dmg,kind){for(const e of G.enemies){if(e.dead)continue;const dx=e.x-x,dy=(ecy(e)-y)*.7;if(Math.hypot(dx,dy)<=r+e.hw)dmgEnemy(e,dmg,{col:'fire',kb:25})}
@@ -919,10 +924,14 @@ function endRun(reborn){clearRun();state='over';const souls=Math.floor((G.stage*
  $('oSoul').textContent='+'+souls;show('ovOver')}
 let shopBack='ovTitle';
 function openShop(from){shopBack=from;renderShop();show('ovShop')}
-function renderShop(){$('sSoul').textContent=SAVE.souls;const L=$('shopList');L.innerHTML='';
- META.forEach(m=>{const lv=SAVE.meta[m.id],mx=lv>=m.max,c=mx?0:m.cost(lv);const r=document.createElement('div');r.className='srow';
-  r.innerHTML=`<img src="${iconURL(m.icon)}"><div><div class="nm">${m.name}<span>${lv}/${m.max}</span></div><div class="ds">${m.d(mx?lv:lv+1)}</div></div>`;
-  const b=document.createElement('button');b.className='btn sm '+(mx?'gray':'gold');b.textContent=mx?'MAX':c+' 영혼';b.disabled=mx||SAVE.souls<c;
+function renderShop(){$('sSoul').textContent=SAVE.souls;const L=$('shopList');L.innerHTML='';const T=metaT(),last=T>=META_T.length-1,all=metaAllMax();
+ const done=META.filter(m=>SAVE.meta[m.id]>=metaMax(m)).length;
+ $('shopTier').innerHTML=`<div class="srow" style="justify-content:space-between"><div><div class="nm">${META_T[T]} 강화 <span style="color:#ffcd75">${'★'.repeat(T+1)}${'☆'.repeat(META_T.length-T-1)}</span></div><div class="ds">${T?`단계 보너스: 공격력·체력·골드 +${T*10}% · `:''}${last?'최종 단계':`전부 MAX 시 진화 (${done}/${META.length})`}</div></div></div>`+
+  (all&&!last?`<button class="btn gold" id="bMetaEvo" style="width:100%;margin-top:calc(var(--u)*3)">★ ${META_T[T+1]} 강화로 진화!</button>`:'');
+ if(all&&!last)$('bMetaEvo').onclick=()=>{initAudio();SAVE.metaT=T+1;save();sfx('lvl');toast(`영혼 강화 진화! ${META_T[T+1]} 단계 — 최대치 증가`);renderShop()};
+ META.forEach(m=>{const lv=SAVE.meta[m.id],M=metaMax(m),mx=lv>=M,c=mx?0:m.cost(lv);const r=document.createElement('div');r.className='srow';
+  r.innerHTML=`<img src="${iconURL(m.icon)}"><div><div class="nm">${m.name}<span>${lv}/${M}</span></div><div class="ds">${m.d(mx?lv:lv+1)}</div></div>`;
+  const b=document.createElement('button');b.className='btn sm '+(mx?'gray':'gold');b.textContent=mx?'MAX':fmt(c)+' 영혼';b.disabled=mx||SAVE.souls<c;
   b.onclick=()=>{initAudio();if(SAVE.souls>=c&&!mx){SAVE.souls-=c;SAVE.meta[m.id]++;save();sfx('buy');renderShop()}};r.appendChild(b);L.appendChild(r)})}
 
 $('bStart').onclick=startRun;$('bCont').onclick=resumeRun;$('bRetry').onclick=startRun;
