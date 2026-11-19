@@ -162,7 +162,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
 // ============================================================
 const W=180,H=320,GY=200,PY=248,WALK=34;
 const cvs=document.getElementById('c'),ctx=cvs.getContext('2d');
-cvs.width=W*2;cvs.height=H*2;ctx.imageSmoothingEnabled=false;
+let SCL=2;cvs.width=W*2;cvs.height=H*2;ctx.imageSmoothingEnabled=false;
 const wrap=document.getElementById('wrap');
 
 // ---------- utils
@@ -750,7 +750,7 @@ function buyUp(u,auto){if(u.max&&G.up[u.id]>=u.max)return;const c=u.cost(G.up[u.
  addText('+'+u.label,G.h.x,GY-30,'gold');burst(G.h.x,GY-8,['#ffcd75','#f4f4f4'],6,40,-20)}
 
 // ---------- render
-function render(){ctx.setTransform(2,0,0,2,0,0);ctx.imageSmoothingEnabled=false;const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage));const sx=G.shake>0?Math.round(rnd(-G.shake,G.shake)):0,sy=G.shake>0?Math.round(rnd(-G.shake,G.shake)*.6):0;
+function render(){ctx.setTransform(SCL,0,0,SCL,0,0);ctx.imageSmoothingEnabled=false;const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage));const sx=G.shake>0?Math.round(rnd(-G.shake,G.shake)):0,sy=G.shake>0?Math.round(rnd(-G.shake,G.shake)*.6):0;
  ctx.save();ctx.translate(sx,sy);
  ctx.drawImage(bg.sky,0,0);
  for(const s of bg.stars){const on=Math.sin(G.time*2+s.p)>.2;ctx.fillStyle=on?'#f4f4f4':'#94b0c2';ctx.fillRect(s.x,s.y,1,1)}
@@ -987,7 +987,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='p
 addEventListener('keydown',e=>{if(state==='play'){if(e.key==='1')buyUp(UPG[0]);if(e.key==='2')buyUp(UPG[1]);if(e.key==='3')buyUp(UPG[2]);if(e.key==='a'||e.key==='A')manualAtk();if(['q','w','e','r'].includes(e.key))useSkill(['q','w','e','r'].indexOf(e.key));if(e.key==='Escape')openPause()}
  else if(state==='levelup'&&['1','2','3'].includes(e.key)&&curCards[+e.key-1])chooseCard(curCards[+e.key-1])});
 
-function resize(){const vw=innerWidth,vh=innerHeight,dpr=window.devicePixelRatio||1;let k=Math.floor(Math.min(vw*dpr/W,vh*dpr/H));if(k>=3&&k%2)k--;
+function resize(){const vw=innerWidth,vh=innerHeight,dpr=window.devicePixelRatio||1;let k=Math.floor(Math.min(vw*dpr/W,vh*dpr/H));const NS=Math.max(2,k);if(NS!==SCL){SCL=NS;cvs.width=W*SCL;cvs.height=H*SCL}
  let s=k>=2?k/dpr:Math.min(vw/W,vh/H);wrap.style.width=(W*s)+'px';wrap.style.height=(H*s)+'px';wrap.style.transform='none';wrap.style.left=Math.round((vw-W*s)/2*dpr)/dpr+'px';wrap.style.top=Math.max(0,Math.round((vh-H*s)/2*dpr)/dpr)+'px';document.documentElement.style.setProperty('--u',s+'px')}
 addEventListener('resize',resize);resize();
 
