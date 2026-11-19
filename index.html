@@ -706,7 +706,8 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  if(e.boss){G.bossKills++;G.hitstop=.28;G.shake=9;vib(80);sfx('boom');G.boss=null;banner('CLEAR!','BOSS DEFEATED','#a7f070');
   for(const m of G.enemies)if(!m.dead&&m!==e)killEnemy(m);G.clearT=1.6}
  else if(!e.minion){G.stageKills++;if(!isBoss(G.stage)&&G.stageKills>=needK(G.stage)&&G.clearT<=0)G.clearT=.6}}
-function gainXp(v){SAVE.xp+=v;while(SAVE.xp>=xpFor(SAVE.lv)){SAVE.xp-=xpFor(SAVE.lv);SAVE.lv++;recalc();G.lvDelay=Math.max(G.lvDelay,.45);addText('LV'+SAVE.lv,G.h.x,GY-34,'heal');
+const LVMAX=999;
+function gainXp(v){if(SAVE.lv>=LVMAX){SAVE.xp=0;return}SAVE.xp+=v;while(SAVE.lv<LVMAX&&SAVE.xp>=xpFor(SAVE.lv)){SAVE.xp-=xpFor(SAVE.lv);SAVE.lv++;recalc();G.lvDelay=Math.max(G.lvDelay,.45);addText('LV'+SAVE.lv,G.h.x,GY-34,'heal');if(SAVE.lv>=LVMAX){SAVE.xp=0;banner('LV 999','MAX LEVEL','#ffb627',2);toast('최고 레벨 999 달성!')}
   G.fx.push({k:'pillar',life:.7,max:.7});burst(G.h.x,GY-10,['#ffcd75','#f4f4f4','#73eff7'],24,70,-30);sfx('lvl');heal(G.st.maxHp*.1)}}
 function hurtHero(d,src){const h=G.h;if(h.dead)return;if(hasR('guard'))d*=.85;if(G.drBuffT>0)d*=1-G.drBuff;if(G.inv>0){if(Math.random()<.3)addText('IMMUNE',h.x,GY-26,'gold');return}d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));if(hasR('frostH')&&src&&!src.dead)src.slowT=2;if(G.shield>0){const a=Math.min(G.shield,d);G.shield-=a;d-=a;if(d<=0){addText('BLOCK',h.x,GY-24,'bolt');return}}h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
  if(G.thornT>0&&src&&!src.dead)dmgEnemy(src,d,{noCrit:true,col:'thorn',sk:null});if(G.st.thorns>0&&src&&!src.dead)dmgEnemy(src,d*G.st.thorns,{noCrit:true,col:'thorn'});
@@ -1020,7 +1021,7 @@ function drawHUD(){const h=G.h,S=G.st;
  if(G.shield>0){ctx.fillStyle='#73eff7';ctx.fillRect(4,252,Math.min(128,Math.ceil(128*G.shield/S.maxHp)),2)}
  txt(fmt(h.hp)+'/'+fmt(S.maxHp),68,253,'#f4f4f4',1,'c');
  G.relics.forEach((r,i)=>{ctx.fillStyle='rgba(26,28,44,.7)';ctx.fillRect(2+i*12,25,11,11);ctx.drawImage(icon(RELICS[r].icon).c,3+i*12,26)});
- ctx.fillStyle='#333c57';ctx.fillRect(4,262,128,3);ctx.fillStyle='#73eff7';ctx.fillRect(4,262,Math.round(128*SAVE.xp/xpFor(SAVE.lv)),3);
+ ctx.fillStyle='#333c57';ctx.fillRect(4,262,128,3);ctx.fillStyle='#73eff7';ctx.fillRect(4,262,Math.round(128*(SAVE.lv>=LVMAX?1:SAVE.xp/xpFor(SAVE.lv))),3);
  txt('LV'+SAVE.lv,156,256,'#73eff7',1,'c');
  // skill slots
  BTN.length=0;
