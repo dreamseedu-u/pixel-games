@@ -141,7 +141,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
 
   <div class="ov" id="ovPet">
     <div class="hd">펫</div>
-    <div class="sub">보스·정예가 떨어뜨리는 알에서 부화 · 최대 3마리 동행<br>Lv10·Lv20에 진화 · 같은 펫 알은 경험치로 바뀝니다</div>
+    <div class="sub">보스·정예가 떨어뜨리는 알에서 부화 · 최대 3마리 동행<br>사냥하면 경험치가 쌓여 레벨업 · 50레벨마다 별 진화 (최대 Lv250 ★5)</div>
     <div class="shoplist" id="petList"></div>
     <button class="btn" id="bPetBack">돌아가기</button>
   </div>
@@ -510,14 +510,14 @@ const PTIER=[{n:'일반',c:'#94b0c2'},{n:'희귀',c:'#41a6f6'},{n:'영웅',c:'#c
 const PSW={dragon:[{r:'p',o:'a'},{r:'y',o:'w'}],fairy:[{a:'l'},{a:'y',y:'w'}],cat:[{y:'w',r:'c'},{y:'o'}],ice:[{a:'c',c:'b'},{a:'w',c:'a'}],ghost:[{w:'a'},{w:'y'}],wolf:[{s:'d',w:'s'},{s:'w',w:'a'}],owl:[{o:'s'},{o:'y'}],turtle:[{g:'b',t:'n'},{g:'y',t:'o'}],bee:[{y:'o'},{y:'a'}],slime:[{c:'v',a:'w'},{c:'y',a:'w',n:'o'}]};
 const petSpr=(id,f)=>spr('p_'+id+f,MAPS['p_'+id],f?PSW[id][f-1]:null);
 const PCD={bee:.6,turtle:7,fairy:4,wolf:1.5,dragon:2,ice:3,ghost:2.5};
-const petForm=lv=>lv>=20?2:lv>=10?1:0;
-const petXpFor=lv=>10+lv*6;
-function petPow(id){const P=SAVE.pets[id];if(!P)return 0;return(1+(P.lv-1)*.08)*[1,1.6,2.5][petForm(P.lv)]}
+const PMAX=250,petStar=lv=>Math.min(5,Math.floor(lv/50)),petForm=lv=>{const t=petStar(lv);return t>=5?2:t>=2?1:0};
+const petXpFor=lv=>Math.floor(5+lv*.5);
+function petPow(id){const P=SAVE.pets[id];if(!P)return 0;return(1+(P.lv-1)*.012)*(1+.3*petStar(P.lv))}
 const inParty=id=>SAVE.party.includes(id);
-function petGainXp(id,v){const P=SAVE.pets[id];if(!P||P.lv>=30)return;const f0=petForm(P.lv);P.xp+=v;
- while(P.lv<30&&P.xp>=petXpFor(P.lv)){P.xp-=petXpFor(P.lv);P.lv++;
+function petGainXp(id,v){const P=SAVE.pets[id];if(!P||P.lv>=PMAX)return;const f0=petForm(P.lv),s0=petStar(P.lv);P.xp+=v;
+ while(P.lv<PMAX&&P.xp>=petXpFor(P.lv)){P.xp-=petXpFor(P.lv);P.lv++;
   if(G&&state==='play'){addText('PET LV'+P.lv,G.h.x-14,GY-34,'heal')}}
- if(petForm(P.lv)>f0){if(G&&state==='play'){banner('EVOLVE!','PET','#a7f070');burst(G.h.x-14,GY-20,['#a7f070','#f4f4f4','#ffcd75'],30,70,-30);sfx('lvl')}toast('진화! '+PETS[id].f[f0]+' → '+PETS[id].f[petForm(P.lv)]);if(G)recalc()}}
+ const s1=petStar(P.lv);if(s1>s0){if(G&&state==='play'){banner('EVOLVE!',s1>=5?'FINAL':'PET','#a7f070');burst(G.h.x-14,GY-20,['#a7f070','#f4f4f4','#ffcd75'],30,70,-30);sfx('lvl')}toast((s1>=5?'최종 진화! ':'펫 진화! ')+PETS[id].f[petForm(P.lv)]+' '+stars(s1));if(G)recalc()}}
 function hatch(){const r=Math.random(),t=r<.55?0:r<.88?1:2;const id=pick(Object.keys(PETS).filter(k=>PETS[k].t===t));
  if(SAVE.pets[id]){petGainXp(id,40);toast('알 → '+PETS[id].f[petForm(SAVE.pets[id].lv)]+' 경험치 +40')}
  else{SAVE.pets[id]={lv:1,xp:0};if(SAVE.party.length<3){SAVE.party.push(id);G.petT[id]=1}toast('새 펫 부화! ['+PTIER[t].n+'] '+PETS[id].f[0]+(inParty(id)?' (동행 중)':' — 타이틀 > 펫에서 편성'));if(G)recalc()}
@@ -580,7 +580,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:e.boss?40:10,life:.25,max:.25,col:'#f4f4f4',sy:1});
  if(hasR('fang'))heal(G.st.maxHp*.02,true);
  if(hasR('bomb')&&!e.boss){G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:16,life:.2,max:.2,col:'#ef7d57',sy:.7});for(const o of G.enemies)if(!o.dead&&o!==e&&Math.abs(o.x-e.x)<18)dmgEnemy(o,G.st.atk*.8,{col:'fire',noCrit:true})}
- for(const id of SAVE.party)petGainXp(id,1);
+ for(const id of SAVE.party)petGainXp(id,(1+Math.floor(G.stage/10))*(e.boss?20:e.elite?3:1));
  {const pb=inParty('slime')?1+.25*petPow('slime'):1;const ec=(e.boss?(Object.keys(SAVE.pets).length?.3:1):e.elite?.03:0)*pb;if(Math.random()<ec)G.drops.push({x:e.x+6,y:cy,vy:-90,t:0,egg:true})}
  {const ch=(e.boss?1:e.elite?.3:.03)*(hasR('lucky')?2:1)*(inParty('slime')?1+.25*petPow('slime'):1);if(Math.random()<ch)G.drops.push({x:e.x,y:cy,vy:-80,t:0,it:makeItem(rollIRar(e.boss),G.stage)})}
  if(e.boss){const rs=Object.keys(RELICS).filter(r=>!G.relics.includes(r));if(rs.length){const r=pick(rs);G.relics.push(r);recalc();setTimeout(()=>toast('유물 획득: '+RELICS[r].n+' — '+RELICS[r].d),900)}}
@@ -745,12 +745,12 @@ function render(){const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage))
  // enemies
  const es=[...G.enemies].sort((a,b)=>b.x-a.x);
  for(const e of es)drawEnemy(e);
- SAVE.party.forEach((id,i)=>{if(G.h.dead)return;const P=SAVE.pets[id];if(!P)return;const f=petForm(P.lv),sp=petSpr(id,f),pp=petPos(i);
+ SAVE.party.forEach((id,i)=>{if(G.h.dead)return;const P=SAVE.pets[id];if(!P)return;const f=petForm(P.lv),st=petStar(P.lv),sp=petSpr(id,f),pp=petPos(i);
   const x=Math.round(pp.x-sp.w/2),y=Math.round(pp.y-sp.h/2+(i===1&&G.walking&&Math.floor(G.time*8)%2?-1:0));
-  if(f===2){const pw=spr('pwing',MAPS.pwing),fl=Math.floor(G.time*8)%2;ctx.drawImage(pw.c,Math.round(pp.x-4),y+2-fl)}
-  if(f>=1){const k='pg'+id+f,gl=SC[k]||(SC[k]=sil(sp.c,f===2?'#ffcd75':'#f4f4f4'));ctx.globalAlpha=f===2?.55+.3*Math.sin(G.time*6):.3;for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(gl,x+dx,y+dy);ctx.globalAlpha=1}
-  ctx.drawImage(sp.c,x,y);if(f===2){const cr=spr('pcrown',MAPS.pcrown);ctx.drawImage(cr.c,Math.round(pp.x-2),y-3)}
-  if(f===2&&Math.random()<.15)G.parts.push({x:pp.x+rnd(-5,5),y:pp.y+rnd(-5,5),vx:0,vy:-10,life:.4,c:'#ffcd75',s:1,g:0})});
+  if(st>=3){const pw=spr('pwing',MAPS.pwing),fl=Math.floor(G.time*8)%2;ctx.drawImage(pw.c,Math.round(pp.x-4),y+2-fl)}
+  if(st>=1){const gold=st>=4,k='pg'+id+f+gold,gl=SC[k]||(SC[k]=sil(sp.c,gold?'#ffcd75':'#f4f4f4'));ctx.globalAlpha=gold?.55+.3*Math.sin(G.time*6):.3;for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(gl,x+dx,y+dy);ctx.globalAlpha=1}
+  ctx.drawImage(sp.c,x,y);if(st>=5){const cr=spr('pcrown',MAPS.pcrown);ctx.drawImage(cr.c,Math.round(pp.x-2),y-3)}
+  if(st>=4&&Math.random()<.15)G.parts.push({x:pp.x+rnd(-5,5),y:pp.y+rnd(-5,5),vx:0,vy:-10,life:.4,c:'#ffcd75',s:1,g:0})});
  drawHero();drawBl(false);
  if(G.shield>0&&!G.h.dead){const a=.5+.3*Math.sin(G.time*6);ctx.globalAlpha=a;ring(G.h.x,GY-9,12,'#73eff7',1);ctx.globalAlpha=1}
  for(const d of G.drops){if(d.egg){const eg=spr('egg',MAPS.egg);ctx.drawImage(eg.c,Math.round(d.x-3),Math.round(d.y-4+Math.sin(G.time*8)));continue}const ic=icon(ISLOT[d.it.slot].icon),c=IRAR[d.it.rar].c,k='gl'+d.it.slot+d.it.rar,gl=SC[k]||(SC[k]=sil(ic.c,c));const bob=d.t>=.7?0:0,x=Math.round(d.x-4),y=Math.round(d.y-4+Math.sin(G.time*8)*1);
@@ -911,7 +911,7 @@ function openPause(){if(state!=='play')return;state='pause';const S=G.st,pc=v=>M
  const sk=G.skills.map(s=>skName(s)+(evS(s)?' '+stars(evS(s)):' Lv'+s.lv)).join(', ')||'없음';const sp=[...G.owned].map(id=>SPECC.find(c=>c.id===id).name).join(', ')||'없음';
  const eq=Object.keys(ISLOT).map(k=>{const it=SAVE.eq[k];return it?`<span style="color:${IRAR[it.rar].c};width:auto">${it.name}</span>`:''}).filter(Boolean).join(' · ')||'없음';
  const rows=[['직업',(SAVE.job.b?jobName()+' ('+SAVE.job.t+'차)':'없음 · Lv'+JOBLV[0]+' 전직')+` · 환생 ★${SAVE.rebirth||0}`,'#ffcd75'],['스킬',sk,'#73eff7'],['특성',sp,'#c46cf0'],['유물',G.relics.map(r=>RELICS[r].n).join(', ')||'없음','#ef7d57'],
-  ['펫',SAVE.party.map(id=>PETS[id].f[petForm(SAVE.pets[id].lv)]+' Lv'+SAVE.pets[id].lv).join(', ')||'없음','#a7f070'],['장비',eq,'#f4f4f4']];
+  ['펫',SAVE.party.map(id=>PETS[id].f[petForm(SAVE.pets[id].lv)]+' Lv'+SAVE.pets[id].lv+(petStar(SAVE.pets[id].lv)?' '+'★'.repeat(petStar(SAVE.pets[id].lv)):'')).join(', ')||'없음','#a7f070'],['장비',eq,'#f4f4f4']];
  $('pBuild').innerHTML=rows.map(([k,v,c])=>`<div><span>${k}</span><em style="color:${c}">${v}</em></div>`).join('');
  $('bRebirth').style.display=G.stage>=REBIRTH_ST?'':'none';show('ovPause')}
 function endRun(reborn){clearRun();state='over';const souls=Math.floor((G.stage*1.5+G.bossKills*6+G.totalKills/8)*(reborn?2:1));if(reborn)SAVE.rebirth=(SAVE.rebirth||0)+1;$('oHd').textContent=reborn?'★ 환생 완료 ★':'사냥 종료';SAVE.souls+=souls;SAVE.runs++;if(G.stage>SAVE.best)SAVE.best=G.stage;save();
@@ -930,8 +930,8 @@ function petImg(id,dim){const P=SAVE.pets[id],f=P?petForm(P.lv):0,s=petSpr(id,f)
 function openPet(){const L=$('petList');L.innerHTML='';const ids=Object.keys(PETS).sort((a,b)=>(SAVE.pets[b]?1:0)-(SAVE.pets[a]?1:0)||PETS[b].t-PETS[a].t);
  for(const id of ids){const D=PETS[id],P=SAVE.pets[id],T=PTIER[D.t];const r=document.createElement('div');r.className='srow';
   if(!P){r.innerHTML=`<img src="${petImg(id,true)}"><div><div class="nm" style="color:#566c86">???<span style="color:${T.c}">${T.n}</span></div><div class="ds">아직 만나지 못한 펫</div></div>`;L.appendChild(r);continue}
-  const f=petForm(P.lv),nx=P.lv<10?'Lv10 진화':P.lv<20?'Lv20 최종 진화':'최종 진화 완료';
-  r.innerHTML=`<img src="${petImg(id)}" style="border:var(--u) solid ${T.c}"><div><div class="nm">${D.f[f]}<span>Lv${P.lv} · ${f+1}단계 · ${T.n}</span></div><div class="ds">${D.d(petPow(id))}<br>EXP ${Math.floor(P.xp)}/${petXpFor(P.lv)} · ${nx}</div></div>`;
+  const f=petForm(P.lv),st=petStar(P.lv),nx=st>=5?'최종 진화 완료':'Lv'+(st+1)*50+(st===4?' 최종 진화':' 진화');
+  r.innerHTML=`<img src="${petImg(id)}" style="border:var(--u) solid ${T.c}"><div><div class="nm">${D.f[f]} <span style="color:#ffcd75">${stars(st)}</span><span>Lv${P.lv} · ${T.n}</span></div><div class="ds">${D.d(petPow(id))}<br>EXP ${Math.floor(P.xp)}/${petXpFor(P.lv)} · ${nx}</div></div>`;
   const b=document.createElement('button');const on=inParty(id);b.className='btn sm '+(on?'gold':'gray');b.textContent=on?'동행 중':'편성';
   b.onclick=()=>{sfx('click');if(on)SAVE.party=SAVE.party.filter(x=>x!==id);else{if(SAVE.party.length>=3){toast('최대 3마리 — 먼저 한 마리를 해제하세요');return}SAVE.party.push(id)}save();openPet()};r.appendChild(b);L.appendChild(r)}
  show('ovPet')}
