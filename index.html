@@ -104,6 +104,14 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <div class="row"><button class="btn sm gray" id="bTreeReset">초기화</button><button class="btn" id="bTreeBack" style="min-width:0;flex:1">돌아가기</button></div>
   </div>
 
+  <div class="ov" id="ovAsk" style="z-index:7">
+    <div class="srow" style="flex-direction:column;align-items:stretch;gap:calc(var(--u)*5);padding:calc(var(--u)*8) calc(var(--u)*6);box-shadow:0 0 0 calc(var(--u)*1.5) #ff4d6a">
+      <div class="hd" style="font-size:calc(var(--u)*9);color:#ff4d6a;text-align:center">⚠ 전체 초기화</div>
+      <div class="sub" id="askMsg" style="color:#f4f4f4;font-size:calc(var(--u)*6);text-align:center"></div>
+      <div class="row"><button class="btn" id="askYes" style="min-width:0;flex:1;background:#b13e53">예</button><button class="btn gray" id="askNo" style="min-width:0;flex:1">아니오</button></div>
+    </div>
+  </div>
+
   <div class="ov" id="ovSet">
     <div class="hd">설정</div>
     <div class="build" style="font-size:calc(var(--u)*6)">
@@ -112,7 +120,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
       <div style="align-items:center"><span style="width:auto;flex:1;color:#f4f4f4">🖥 화면</span><button class="btn sm" id="bCrisp" style="min-width:calc(var(--u)*34)">꽉 채우기</button></div>
     </div>
     <button class="btn sm" id="bInstall" style="background:#38b764">📲 홈 화면에 바로가기 추가</button>
-    <button class="btn sm" id="bWipe" style="background:#b13e53">⚠ 전체 초기화 (Lv1부터 다시 시작)</button>
+    <button class="btn sm" id="bWipe" style="background:#b13e53">⚠ 전체 초기화</button>
     <button class="btn gray" id="bSetBack">돌아가기</button>
   </div>
 
@@ -1152,10 +1160,10 @@ if($('bTree2'))$('bTree2').onclick=()=>{sfx('click');openTree('pause')};
 $('bTreeBack').onclick=()=>{sfx('click');if(treeFrom==='pause'){openPause2()}else goTitle()};
 $('bTreeReset').onclick=()=>{SAVE.tree={};save();sfx('click');if(G&&G.st)recalc();openTree();toast('스킬 포인트를 모두 돌려받았어요')};
 function openPause2(){state='play';openPause()}
-$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';setMute(muted);crispLbl();vibLbl();show('ovSet')};let wipeT=null;$('bWipe').onclick=()=>{sfx('click');const b=$('bWipe');
- if(!b.dataset.arm){b.dataset.arm=1;b.textContent='정말 초기화할까요? 한 번 더 누르면 모든 기록이 지워집니다';b.style.background='#ff4d6a';clearTimeout(wipeT);wipeT=setTimeout(()=>{delete b.dataset.arm;b.textContent='⚠ 전체 초기화 (Lv1부터 다시 시작)';b.style.background='#b13e53'},4000);return}
- clearTimeout(wipeT);delete b.dataset.arm;const keep={mute:SAVE.mute,noVib:SAVE.noVib,crisp:SAVE.crisp};try{localStorage.removeItem('pxhunter_v1');localStorage.removeItem(RUNKEY)}catch(e){}
- SAVE=Object.assign(SAVE0(),keep);save();b.textContent='⚠ 전체 초기화 (Lv1부터 다시 시작)';b.style.background='#b13e53';toast('모든 기록을 초기화했어요. Lv1부터 다시 시작합니다');goTitle()};
+$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';setMute(muted);crispLbl();vibLbl();show('ovSet')};function ask(msg,yes,back){$('askMsg').innerHTML=msg;show('ovAsk');$('askYes').onclick=()=>{sfx('click');yes()};$('askNo').onclick=()=>{sfx('click');show(back)}}
+$('bWipe').onclick=()=>{sfx('click');ask('모든 기록을 지우고 <b style="color:#ffcd75">Lv1부터 다시 시작</b>할까요?<br><br><span style="color:#94b0c2;font-size:.85em">레벨·전직·환생·영혼·장비·펫·최고 기록이 모두 지워지며<br>되돌릴 수 없습니다</span>',()=>{
+ const keep={mute:SAVE.mute,noVib:SAVE.noVib,crisp:SAVE.crisp};try{localStorage.removeItem('pxhunter_v1');localStorage.removeItem(RUNKEY)}catch(e){}
+ SAVE=Object.assign(SAVE0(),keep);save();goTitle();toast('모든 기록을 초기화했어요. Lv1부터 다시 시작합니다')},'ovSet')};
 let setFrom='title';$('bSetBack').onclick=()=>{sfx('click');if(setFrom==='pause'){show('ovPause')}else goTitle()};
 $('bSet2').onclick=()=>{sfx('click');setFrom='pause';crispLbl();vibLbl();setMute(muted);show('ovSet')};
 $('bPet1').onclick=()=>{initAudio();sfx('click');openPet()};$('bPetBack').onclick=()=>{sfx('click');goTitle()};
