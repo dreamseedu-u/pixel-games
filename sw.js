@@ -1,5 +1,5 @@
 // 오프라인 플레이용: 인터넷이 되면 항상 최신 버전, 안 되면 저장된 버전으로 실행
-const CACHE='pixel-hunter-v32';
+const CACHE='pixel-hunter-v33';
 const FILES=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});

@@ -1113,6 +1113,8 @@ function genCards(){const L=SAVE.meta.luck;const wts=[Math.max(20,60-L*5),28+L*2
   {const bv=G.basicEvo||0,br=bv<4?1:bv<5?2:3;if(bv<6&&r===br)for(let k=0;k<3;k++)pool.push({kind:'basic',r:br,key:'basic'})}
   if(r<=1)G.skills.forEach(s=>{if(s.lv<5)for(let k=0;k<3;k++)pool.push({kind:'skill',id:s.id,r,up:Math.min(r===0?1:2,5-s.lv),key:'k'+s.id})});
   pool=pool.filter(p=>!out.some(o=>o.key===p.key));if(pool.length)out.push(pick(pool))}
+ {const ev=[];G.skills.forEach(sk=>{const e=evS(sk);if(sk.lv>=5&&e<5)ev.push({kind:'skill',id:sk.id,r:e>=4?3:2,evo:true,key:'e'+sk.id});else if(e===5)ev.push({kind:'skill',id:sk.id,r:3,evo:true,ult:true,key:'u'+sk.id})});
+ if(ev.length&&!out.some(o=>o.evo)){const c=pick(ev);let i=out.findIndex(o=>o.kind==='stat');if(i<0)i=out.findIndex(o=>o.kind!=='basic');out[i>=0?i:out.length-1]=c}}
  if(!G.skills.length&&!out.some(o=>o.isNew)){const ids=Object.keys(SKILLS);const pickId=pick(ids.filter(id=>!out.some(o=>o.key==='k'+id)));out[0]={kind:'skill',id:pickId,r:1,isNew:true,key:'k'+pickId}}
  return out}
 function cardInfo(cd){if(cd.kind==='basic'){const bv=G.basicEvo||0,nx=bv+1;const BD=['공격 범위 증가','30% 확률 추가 타격','기본 공격 범위 공격','공격 속도 +20%','5번째 공격마다 화면 전체 일섬 (200%)','공격마다 관통 검기 발사, 피해 ×1.5'];return{icon:'basic',name:basicName(nx)+' '+stars(nx),d:BD[bv]+(nx<=5?' · 기본 공격 피해 +'+(nx*15)+'%':''),tag:nx>=6?'⚡ 궁극 진화 (기본 공격)':nx>=5?'★ 최종 진화 (기본 공격)':'★ 기본 공격 진화 '+nx+'단계'}}if(cd.kind==='stat')return{icon:cd.c.icon,name:cd.c.name,d:cd.c.d(cd.c.v[cd.r])};if(cd.kind==='spec')return{icon:cd.c.icon,name:cd.c.name,d:cd.c.d};
