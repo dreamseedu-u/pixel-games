@@ -677,6 +677,7 @@ function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;
   render()}catch(err){console.error(err)}
  requestAnimationFrame(frame)}
 setInterval(saveRun,3000);addEventListener('pagehide',saveRun);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveRun()});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http')){addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
 load();muted=!!SAVE.mute;setMute(muted);goTitle();requestAnimationFrame(frame);
 window.__dbg={get G(){return G},get state(){return state},startRun,chooseCard:i=>chooseCard(curCards[i])};
 </script>
