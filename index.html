@@ -239,6 +239,7 @@ p_slime:["............", "....kkkk....", "...kccack...", "..kcwwacck..", ".kccwa
 pwing:["k......k", "wk....kw", "wwk..kww", ".wk..kw.", "..k..k.."],
 pcrown:["y.y.y", "yyyyy", "kkkkk"],
 horns:["kk..........kk", "kwk........kwk", ".kwk......kwk.", "..kk......kk.."],bshield:[".kkkk.", "ksyysk", "ksyysk", "kssssk", "kssssk", ".kssk.", "..kk.."],w_great:["...k...", "..kwk..", "..kwk..", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", ".kwwsk.", "kyyyyyk", "..kmk..", "..kmk..", "..kyk..", "...k..."],
+slime_b:["..............", "....kkkkkk....", "..kgglwwlggk..", ".kgggllwlgggk.", ".kggggggggggk.", "kgggkkggkkgggk", "kgggkwggkwgggk", "kggggggggggggk", "kgggggttgggggk", ".kttggggggttk.", "..kkkkkkkkkk.."],goblin_b:["..............", ".....kkkk.....", "k...kggggk...k", "kgk.kggggk.kgk", ".kgkggggggkgk.", "..kggrggrggk..", "..kggggggggk..", "..kgkwkwkwgk..", "...kggggggk...", "..kkmmmmmmkk..", "wkgkmMmmMmkgk.", "wkkkmmmmmmkkk.", "..kmmmmmmmmk..", "....kgkkgk....", "...kgk..kgk...", "..kkk....kkk.."],skel_b:["....kkkkk.....", "...kwwwwwk....", "..kwwwwwwwk...", "..kwkkwkkwk...", "..kwkrwkrwk...", "..kwwwkwwwk...", "...kwkwkwk....", "....kkkkk.....", "..kk.kwk.kk...", ".kwkkwwwkkwk..", ".kwkwkwkwkwk..", ".kk.kwwwk.kk..", "....kwkwk.....", "....kkwkk.....", "....kwkwk.....", "...kwk.kwk....", "...kwk.kwk....", "..kkk...kkk..."],
 shur:["..w..",".sws.","wwkww",".sws.","..w.."]
 };
 const ICONS={armor:['armor'],sword:['sword'],heart:['heart'],wind:['wind'],coin:['coin'],fire:['fire'],bolt:['bolt'],blade:['blade'],frost:['frost'],
@@ -400,11 +401,11 @@ const META=[
 
 // ---------- game data
 const ETYPES={
- slime:{maps:['slime'],hp:1,atk:1,spd:16,gold:1,xp:1},
+ slime:{maps:['slime','slime_b'],hp:1,atk:1,spd:16,gold:1,xp:1},
  bat:{maps:['bat_a','bat_b'],hp:.7,atk:.8,spd:28,fly:true,gold:1,xp:1},
- goblin:{maps:['goblin'],hp:1.3,atk:1.3,spd:22,gold:1.5,xp:1.5},
- skel:{maps:['skel'],hp:2,atk:1.4,spd:12,gold:2,xp:2},
- archer:{maps:['skel'],swap:{w:'s',k:'k'},hp:1.2,atk:1.1,spd:13,ranged:true,range:78,gold:2,xp:2}};
+ goblin:{maps:['goblin','goblin_b'],hp:1.3,atk:1.3,spd:22,gold:1.5,xp:1.5},
+ skel:{maps:['skel','skel_b'],hp:2,atk:1.4,spd:12,gold:2,xp:2},
+ archer:{maps:['skel','skel_b'],swap:{w:'s',k:'k'},hp:1.2,atk:1.1,spd:13,ranged:true,range:78,gold:2,xp:2}};
 const BOSSES=[{type:'slime',name:'SLIME KING',hpM:11,atkM:1.8},{type:'goblin',name:'GOBLIN CHIEF',hpM:12,atkM:2},{type:'skel',name:'BONE LORD',hpM:13,atkM:2},{type:'bat',name:'BLOOD QUEEN',hpM:11,atkM:2.2}];
 const SKILLS={
  fire:{name:'화염구',icon:'fire',cd:l=>2.5-l*.15,desc:'가장 가까운 적에게 폭발하는 화염구를 발사',up:'피해·폭발 범위 증가, Lv3부터 2발'},
@@ -787,10 +788,9 @@ function drawHero(){const h=G.h,J=SAVE.job||{},jb=J.b?J.b+J.t:'';const walk=G.wa
  if(J.t>=3&&!h.dead&&Math.random()<.2)G.parts.push({x:h.x+rnd(-6,6),y:GY-rnd(4,20),vx:0,vy:-12,life:.5,c:J.b==='war'?'#ffcd75':J.b==='mage'?'#73eff7':'#9d5ad6',s:1,g:0});
  ctx.globalAlpha=1;
  if(G.revive&&!h.dead&&Math.floor(G.time*2)%4===0){ctx.fillStyle='#ef7d57';ctx.fillRect(x+7,y-2,1,1)}}
-function drawEnemy(e){const fr=e.type==='bat'?Math.floor(e.t*8)%2:0;const s=eSpr(e.type,fr,e.boss);
- let sxs=e.sc,sys=e.sc;if(e.type==='slime'){const q=Math.sin(e.t*(e.slowT>0?4:8))*.1;sxs*=1+q;sys*=1-q}
+function drawEnemy(e){const mv=e.x>G.h.x+12+e.hw+1;const fr=e.type==='bat'?Math.floor(e.t*8)%2:e.type==='slime'?Math.floor(e.t*(e.slowT>0?2:4))%2:mv?Math.floor(e.t*(e.slowT>0?3:6))%2:0;const s=eSpr(e.type,fr,e.boss);
+ const sxs=e.sc,sys=e.sc;
  const w=Math.round(s.w*sxs),hh=Math.round(s.h*sys);let x=Math.round(e.x-w/2-(e.atkAnim>0?3:0)),y=Math.round(e.fly?ecy(e)-hh/2:GY-hh);
- if(!e.fly&&e.type!=='slime'&&e.x>G.h.x+12+e.hw&&Math.floor(e.t*6)%2)y-=1;
  if(e.boss&&e.windup>0){x+=Math.round(rnd(-1,1));}
  if(e.elite||e.boss){const img=e.boss?s.rd:s.rd;ctx.globalAlpha=.35+.25*Math.sin(G.time*8);for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(img,x+dx,y+dy,w,hh);ctx.globalAlpha=1}
  ctx.drawImage(e.flash>0?s.wh:s.c,x,y,w,hh);
@@ -955,8 +955,8 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='p
 addEventListener('keydown',e=>{if(state==='play'){if(e.key==='1')buyUp(UPG[0]);if(e.key==='2')buyUp(UPG[1]);if(e.key==='3')buyUp(UPG[2]);if(e.key==='a'||e.key==='A')manualAtk();if(['q','w','e','r'].includes(e.key))useSkill(['q','w','e','r'].indexOf(e.key));if(e.key==='Escape')openPause()}
  else if(state==='levelup'&&['1','2','3'].includes(e.key)&&curCards[+e.key-1])chooseCard(curCards[+e.key-1])});
 
-function resize(){const vw=innerWidth,vh=innerHeight;let s=Math.min(vw/W,vh/H);if(s>=2)s=Math.max(2,Math.floor(s*4)/4);
- wrap.style.width=Math.round(W*s)+'px';wrap.style.height=Math.round(H*s)+'px';document.documentElement.style.setProperty('--u',s+'px')}
+function resize(){const vw=innerWidth,vh=innerHeight,dpr=window.devicePixelRatio||1;let k=Math.floor(Math.min(vw*dpr/W,vh*dpr/H));
+ let s=k>=2?k/dpr:Math.min(vw/W,vh/H);wrap.style.width=(W*s)+'px';wrap.style.height=(H*s)+'px';wrap.style.transform='none';wrap.style.left=Math.round((vw-W*s)/2*dpr)/dpr+'px';wrap.style.top=Math.max(0,Math.round((vh-H*s)/2*dpr)/dpr)+'px';document.documentElement.style.setProperty('--u',s+'px')}
 addEventListener('resize',resize);resize();
 
 let last=performance.now();
