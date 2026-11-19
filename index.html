@@ -112,6 +112,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
       <div style="align-items:center"><span style="width:auto;flex:1;color:#f4f4f4">🖥 화면</span><button class="btn sm" id="bCrisp" style="min-width:calc(var(--u)*34)">꽉 채우기</button></div>
     </div>
     <button class="btn sm" id="bInstall" style="background:#38b764">📲 홈 화면에 바로가기 추가</button>
+    <button class="btn sm" id="bWipe" style="background:#b13e53">⚠ 전체 초기화 (Lv1부터 다시 시작)</button>
     <button class="btn gray" id="bSetBack">돌아가기</button>
   </div>
 
@@ -419,6 +420,7 @@ function setMute(m){muted=m;if(master)master.gain.value=m?0:.4;tgl($('bSnd1'),!m
 function vib(ms){if(SAVE.noVib)return;try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 
 // ---------- save / meta
+const SAVE0=()=>({souls:0,best:0,runs:0,mute:false,rebirth:0,tree:{},metaT:0,lv:1,xp:0,job:{b:null,t:0},eq:{},pets:{},party:[],meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}});
 let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,tree:{},metaT:0,lv:1,xp:0,job:{b:null,t:0},eq:{},pets:{},party:[],meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
 function load(){try{const s=JSON.parse(localStorage.getItem('pxhunter_v1')||'null');if(s)SAVE={...SAVE,...s,meta:{...SAVE.meta,...(s.meta||{})}}}catch(e){}}
 function save(){try{localStorage.setItem('pxhunter_v1',JSON.stringify(SAVE))}catch(e){}}
@@ -1150,7 +1152,11 @@ if($('bTree2'))$('bTree2').onclick=()=>{sfx('click');openTree('pause')};
 $('bTreeBack').onclick=()=>{sfx('click');if(treeFrom==='pause'){openPause2()}else goTitle()};
 $('bTreeReset').onclick=()=>{SAVE.tree={};save();sfx('click');if(G&&G.st)recalc();openTree();toast('스킬 포인트를 모두 돌려받았어요')};
 function openPause2(){state='play';openPause()}
-$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';setMute(muted);crispLbl();vibLbl();show('ovSet')};let setFrom='title';$('bSetBack').onclick=()=>{sfx('click');if(setFrom==='pause'){show('ovPause')}else goTitle()};
+$('bSet1').onclick=()=>{initAudio();sfx('click');setFrom='title';setMute(muted);crispLbl();vibLbl();show('ovSet')};let wipeT=null;$('bWipe').onclick=()=>{sfx('click');const b=$('bWipe');
+ if(!b.dataset.arm){b.dataset.arm=1;b.textContent='정말 초기화할까요? 한 번 더 누르면 모든 기록이 지워집니다';b.style.background='#ff4d6a';clearTimeout(wipeT);wipeT=setTimeout(()=>{delete b.dataset.arm;b.textContent='⚠ 전체 초기화 (Lv1부터 다시 시작)';b.style.background='#b13e53'},4000);return}
+ clearTimeout(wipeT);delete b.dataset.arm;const keep={mute:SAVE.mute,noVib:SAVE.noVib,crisp:SAVE.crisp};try{localStorage.removeItem('pxhunter_v1');localStorage.removeItem(RUNKEY)}catch(e){}
+ SAVE=Object.assign(SAVE0(),keep);save();b.textContent='⚠ 전체 초기화 (Lv1부터 다시 시작)';b.style.background='#b13e53';toast('모든 기록을 초기화했어요. Lv1부터 다시 시작합니다');goTitle()};
+let setFrom='title';$('bSetBack').onclick=()=>{sfx('click');if(setFrom==='pause'){show('ovPause')}else goTitle()};
 $('bSet2').onclick=()=>{sfx('click');setFrom='pause';crispLbl();vibLbl();setMute(muted);show('ovSet')};
 $('bPet1').onclick=()=>{initAudio();sfx('click');openPet()};$('bPetBack').onclick=()=>{sfx('click');goTitle()};
 function openEquip(){const L=$('equipList');L.innerHTML='';for(const k of Object.keys(ISLOT)){const S=ISLOT[k],it=SAVE.eq[k];const r=document.createElement('div');r.className='srow';
