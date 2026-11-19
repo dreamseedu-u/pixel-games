@@ -72,7 +72,7 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <div class="sub" id="titleInfo"></div>
     <button class="btn gold" id="bCont" style="display:none">▶ 이어하기</button>
     <button class="btn gold" id="bStart">▶ 사냥 시작</button>
-    <button class="btn" id="bShop1">영혼 강화</button>
+    <div class="row"><button class="btn" id="bShop1" style="min-width:0;flex:1">영혼 강화</button><button class="btn" id="bEquip1" style="min-width:0;flex:1">장비</button></div>
     <button class="btn sm" id="bInstall" style="display:none;background:#38b764">📲 홈 화면에 바로가기 추가</button>
     <button class="btn sm gray" id="bSnd1">소리: 켜짐</button>
   </div>
@@ -99,6 +99,13 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
     <button class="btn gold" id="bRetry">다시 도전</button>
     <button class="btn" id="bShop2">영혼 강화</button>
     <button class="btn sm gray" id="bHome">타이틀로</button>
+  </div>
+
+  <div class="ov" id="ovEquip">
+    <div class="hd">장비</div>
+    <div class="sub">몬스터·보스가 떨어뜨린 장비 중 더 좋은 것을 자동 장착합니다<br>약한 장비는 영혼으로 바뀝니다</div>
+    <div class="shoplist" id="equipList"></div>
+    <button class="btn" id="bEquipBack">돌아가기</button>
   </div>
 
   <div class="ov" id="ovShop">
@@ -281,12 +288,12 @@ function setMute(m){muted=m;if(master)master.gain.value=m?0:.4;const l='소리: 
 function vib(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 
 // ---------- save / meta
-let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,lv:1,xp:0,job:{b:null,t:0},meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
+let SAVE={souls:0,best:0,runs:0,mute:false,rebirth:0,lv:1,xp:0,job:{b:null,t:0},eq:{},meta:{atk:0,hp:0,gold:0,luck:0,reroll:0,revive:0,start:0}};
 function load(){try{const s=JSON.parse(localStorage.getItem('pxhunter_v1')||'null');if(s)SAVE={...SAVE,...s,meta:{...SAVE.meta,...(s.meta||{})}}}catch(e){}}
 function save(){try{localStorage.setItem('pxhunter_v1',JSON.stringify(SAVE))}catch(e){}}
 const RUNKEY='pxhunter_run_v1';
 function saveRun(){if(!G||state==='title'||state==='over'||G.h.dead)return;try{localStorage.setItem(RUNKEY,JSON.stringify({stage:G.stage,gold:G.gold,runGold:G.runGold,skillAuto:G.skillAuto,
- totalKills:G.totalKills,bossKills:G.bossKills,up:G.up,mods:G.mods,owned:[...G.owned],skills:G.skills.map(s=>({id:s.id,lv:s.lv})),revive:G.revive,rerolls:G.rerolls,
+ totalKills:G.totalKills,bossKills:G.bossKills,up:G.up,mods:G.mods,owned:[...G.owned],skills:G.skills.map(s=>({id:s.id,lv:s.lv})),relics:G.relics,revive:G.revive,rerolls:G.rerolls,
  autoBuy:G.autoBuy,speed:G.speed,hpR:G.h.hp/G.st.maxHp,pendingLv:G.pendingLv,time:G.time}));save()}catch(e){}}
 function loadRun(){try{return JSON.parse(localStorage.getItem(RUNKEY)||'null')}catch(e){return null}}
 function clearRun(){try{localStorage.removeItem(RUNKEY)}catch(e){}}
@@ -346,6 +353,32 @@ const JOBS={
   {name:'도적',d:'공격 속도 +20%, 치명타 확률 +10%',f:()=>{G.mods.spd+=.2;G.mods.crit+=.1}},
   {name:'암살자',d:'치명타 피해 +50%, 흡혈 +3%',f:()=>{G.mods.critDmg+=.5;G.mods.ls+=.03}},
   {name:'그림자 군주',d:'그림자 분신이 함께 공격 (추가 피해 60%)',f:()=>G.mods.shadow=true}]}};
+const IRAR=[{n:'일반',c:'#94b0c2'},{n:'희귀',c:'#41a6f6'},{n:'영웅',c:'#c46cf0'},{n:'전설',c:'#ffcd75'},{n:'신화',c:'#ff4d6a'}];
+const IRM=[1,1.6,2.5,4,6.5];
+const ISLOT={weapon:{n:'무기',icon:'sword',main:'atk',names:['녹슨 검','강철 검','룬 블레이드','용살검','태초의 검']},
+ armor:{n:'갑옷',icon:'shield',main:'hp',names:['가죽 갑옷','사슬 갑옷','미스릴 갑옷','용린 갑옷','성광의 갑주']},
+ acc:{n:'장신구',icon:'gem',main:'critd',names:['구리 반지','은 반지','마나 목걸이','불사조 부적','별의 심장']}};
+const IBASE={atk:.08,hp:.1,spd:.03,crit:.015,critd:.1,ls:.005,regen:.002,gold:.08,skill:.06,cdr:.02};
+const IKEY={atk:'atk',hp:'hp',spd:'spd',crit:'crit',critd:'critDmg',ls:'ls',regen:'regen',gold:'gold',skill:'skill',cdr:'cdr'};
+const INAME={atk:'공격력',hp:'체력',spd:'공격속도',crit:'치명타',critd:'치명피해',ls:'흡혈',regen:'초당 재생',gold:'골드',skill:'스킬피해',cdr:'쿨타임 감소'};
+function makeItem(rar,stage){const slot=pick(Object.keys(ISLOT)),S=ISLOT[slot],sf=1+(stage-1)*.03,rm=IRM[rar];
+ const it={slot,rar,name:S.names[rar],main:{k:S.main,v:+(IBASE[S.main]*rm*sf).toFixed(4)},opts:[]};
+ const pool=Object.keys(IBASE).filter(k=>k!==S.main);for(let i=0;i<Math.min(rar,3);i++){const k=pool.splice(Math.floor(Math.random()*pool.length),1)[0];const fixed=['crit','ls','regen','cdr'].includes(k);
+  it.opts.push({k,v:+(IBASE[k]*.5*rm*(fixed?1:sf)*rnd(.7,1.3)).toFixed(4)})}return it}
+function iScore(it){if(!it)return 0;let sc=it.main.v/IBASE[it.main.k];for(const o of it.opts)sc+=o.v/IBASE[o.k]*.6;return sc}
+function applyEq(it,sg){if(!it)return;for(const o of[it.main,...it.opts])G.mods[IKEY[o.k]]+=o.v*sg}
+function iLine(o){return INAME[o.k]+' +'+(o.v*100).toFixed(o.v<.01?2:1)+'%'}
+function rollIRar(boss){const w=boss?[0,45,35,15,5]:[62,25,9,3,1];let t=w.reduce((a,b)=>a+b),r=Math.random()*t;for(let i=0;i<5;i++)if((r-=w[i])<0)return i;return 0}
+const RELICS={
+ bomb:{n:'폭발의 핵',icon:'meteor',d:'적 처치 시 주변 폭발 (공격력 80%)'},
+ guard:{n:'수호의 방패',icon:'shield',d:'8초마다 최대 체력 15% 보호막'},
+ fang:{n:'흡혈귀의 송곳니',icon:'drop',d:'적 처치 시 체력 2% 회복'},
+ glass:{n:'시간의 모래시계',icon:'gem',d:'스킬 쿨타임 -10%'},
+ mask:{n:'분노의 가면',icon:'skull2',d:'체력 50% 이하일 때 주는 피해 +40%'},
+ lucky:{n:'행운 동전',icon:'coin',d:'골드 +40%, 장비 드랍률 2배'},
+ ring:{n:'번개 반지',icon:'bolt',d:'기본 공격 시 20% 확률로 번개 (공격력 150%)'},
+ frostH:{n:'서리 심장',icon:'frost',d:'나를 때린 적을 2초간 둔화'}};
+const hasR=id=>G&&G.relics&&G.relics.includes(id);
 const UPG=[
  {id:'atk',label:'ATK',icon:'sword',cost:l=>8*Math.pow(1.2,l)},
  {id:'hp',label:'HP',icon:'heart',cost:l=>8*Math.pow(1.2,l)},
@@ -358,12 +391,13 @@ const biomeOf=s=>Math.floor((s-1)/10)%4;
 const needK=s=>Math.min(20,8+Math.floor(s/3));
 const xpFor=l=>Math.floor(10+l*.6);
 function newRun(){const M=SAVE.meta;
- G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,skillAuto:true,manT:0,atkPress:0,totalKills:0,bossKills:0,time:0,
+ G={stage:1,stageKills:0,spawned:0,gold:0,runGold:0,relics:[],drops:[],shield:0,guardT:8,skillAuto:true,manT:0,atkPress:0,totalKills:0,bossKills:0,time:0,
   up:{atk:0,hp:0,spd:0},mods:{atk:1,hp:1,spd:1,crit:0,critDmg:0,ls:0,regen:0,gold:1,xp:1,thorns:0,cdr:0,double:false,cleave:false,berserk:false,giant:false,skill:1,dr:0,wave:false,echo:0,shadow:false},
   owned:new Set(),skills:[],enemies:[],proj:[],fx:[],parts:[],coins:[],texts:[],amb:[],scroll:0,walking:true,shake:0,hitstop:0,
   pendingLv:0,lvDelay:0,banner:null,revive:M.revive>0,rerolls:M.reroll,autoBuy:false,speed:1,boss:null,bossSpawned:false,bossDelay:0,
   spawnT:1,clearT:0,deadT:0,autoT:0,goldPulse:0,press:{},
   h:{x:44,hp:1,atkT:.3,anim:0,atkAnim:0,flash:0,dead:false,dbl:0}};
+ for(const k in SAVE.eq)applyEq(SAVE.eq[k],1);
  const J=SAVE.job;if(J&&J.b)for(let i=0;i<J.t;i++)JOBS[J.b].t[i].f();
  recalc();G.h.hp=G.st.maxHp;
  if(M.start&&G.skills.length<4){const id=pick(Object.keys(SKILLS).filter(i=>!G.skills.find(s=>s.id===i)));G.skills.push({id,lv:1,t:1})}
@@ -372,7 +406,7 @@ function recalc(){const m=G.mods,M=SAVE.meta,old=G.st?G.st.maxHp:0,RB=(1+(SAVE.r
  G.st={atk:12*Math.pow(1.1,G.up.atk)*m.atk*(1+M.atk*.1)*(m.berserk?2:1)*RB,sk:m.skill,dr:Math.min(.6,m.dr),
   maxHp:100*Math.pow(1.1,G.up.hp)*m.hp*(1+M.hp*.1)*(m.berserk?.7:1)*RB,
   aspd:Math.min(6,1.2*(1+G.up.spd*.05)*m.spd),crit:Math.min(.85,.05+m.crit),critDmg:1.5+m.critDmg,ls:m.ls,regen:m.regen,
-  gold:m.gold*(1+M.gold*.15)*RB,xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr)};
+  gold:m.gold*(1+M.gold*.15)*RB,xp:m.xp,thorns:m.thorns,cdr:Math.min(.6,m.cdr+(hasR('glass')?.1:0))};if(hasR('lucky'))G.st.gold*=1.4;
  if(old&&G.st.maxHp>old)G.h.hp+=G.st.maxHp-old;G.h.hp=Math.min(G.h.hp,G.st.maxHp);
  if(G.healP){heal(G.st.maxHp*G.healP);G.healP=0}}
 
@@ -391,7 +425,7 @@ function heal(v,silent){const h=G.h;if(h.dead)return;const b=h.hp;h.hp=Math.min(
 
 // ---------- combat
 function dmgEnemy(e,base,o={}){if(e.dead)return 0;let crit=o.noCrit?false:(o.crit!==undefined?o.crit:Math.random()<G.st.crit);
- let d=base*rnd(.9,1.1);if(crit)d*=G.st.critDmg;if(G.mods.giant&&(e.boss||e.elite))d*=2;d=Math.max(1,Math.round(d));
+ let d=base*rnd(.9,1.1);if(crit)d*=G.st.critDmg;if(G.mods.giant&&(e.boss||e.elite))d*=2;if(hasR('mask')&&G.h.hp<G.st.maxHp*.5)d*=1.4;d=Math.max(1,Math.round(d));
  e.hp-=d;e.flash=.08;if(o.kb)e.kv=o.kb*(e.boss?.15:1);
  addText(fmt(d),e.x,etop(e)-4,crit?'crit':(o.col||'norm'));
  if(o.melee&&G.st.ls>0)heal(d*G.st.ls,true);
@@ -401,6 +435,10 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  const cy=ecy(e),sp=eSpr(e.type,0,e.boss);const bi=BIOMES[biomeOf(G.stage)];
  burst(e.x,cy,['#f4f4f4',bi.amb,'#1a1c2c',PAL[(bi.swap.g||'g')]],e.boss?60:12,e.boss?120:60);
  G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:e.boss?40:10,life:.25,max:.25,col:'#f4f4f4',sy:1});
+ if(hasR('fang'))heal(G.st.maxHp*.02,true);
+ if(hasR('bomb')&&!e.boss){G.fx.push({k:'ring',x:e.x,y:cy,r0:2,r1:16,life:.2,max:.2,col:'#ef7d57',sy:.7});for(const o of G.enemies)if(!o.dead&&o!==e&&Math.abs(o.x-e.x)<18)dmgEnemy(o,G.st.atk*.8,{col:'fire',noCrit:true})}
+ {const ch=(e.boss?1:e.elite?.3:.03)*(hasR('lucky')?2:1);if(Math.random()<ch)G.drops.push({x:e.x,y:cy,vy:-80,t:0,it:makeItem(rollIRar(e.boss),G.stage)})}
+ if(e.boss){const rs=Object.keys(RELICS).filter(r=>!G.relics.includes(r));if(rs.length){const r=pick(rs);G.relics.push(r);recalc();setTimeout(()=>toast('유물 획득: '+RELICS[r].n+' — '+RELICS[r].d),900)}}
  const nc=Math.min(8,1+(e.elite?3:0)+(e.boss?7:0));for(let i=0;i<nc;i++)G.coins.push({x:e.x,y:cy,vx:rnd(-40,40),vy:rnd(-90,-40),t:rnd(-.1,0)});
  if(e.elite||e.boss)addText('+'+fmt(gold)+'G',e.x,cy-14,'gold');
  sfx('kill');
@@ -409,7 +447,7 @@ function killEnemy(e){if(e.dead)return;e.dead=true;G.totalKills++;
  else if(!e.minion){G.stageKills++;if(!isBoss(G.stage)&&G.stageKills>=needK(G.stage)&&G.clearT<=0)G.clearT=.6}}
 function gainXp(v){SAVE.xp+=v;while(SAVE.xp>=xpFor(SAVE.lv)){SAVE.xp-=xpFor(SAVE.lv);SAVE.lv++;recalc();G.lvDelay=Math.max(G.lvDelay,.45);addText('LV'+SAVE.lv,G.h.x,GY-34,'heal');
   G.fx.push({k:'pillar',life:.7,max:.7});burst(G.h.x,GY-10,['#ffcd75','#f4f4f4','#73eff7'],24,70,-30);sfx('lvl');heal(G.st.maxHp*.1)}}
-function hurtHero(d,src){const h=G.h;if(h.dead)return;d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
+function hurtHero(d,src){const h=G.h;if(h.dead)return;d=Math.max(1,Math.round(d*(1-(G.st.dr||0))));if(hasR('frostH')&&src&&!src.dead)src.slowT=2;if(G.shield>0){const a=Math.min(G.shield,d);G.shield-=a;d-=a;if(d<=0){addText('BLOCK',h.x,GY-24,'bolt');return}}h.hp-=d;h.flash=.12;addText('-'+fmt(d),h.x-2,GY-24,'hurt');sfx('hurt',.08);
  if(G.st.thorns>0&&src&&!src.dead)dmgEnemy(src,d*G.st.thorns,{noCrit:true,col:'thorn'});
  if(h.hp<=0){if(G.revive){G.revive=false;h.hp=G.st.maxHp*.5;banner('REVIVE','불사조의 깃털','#ef7d57');G.fx.push({k:'pillar',life:1,max:1});
    burst(h.x,GY-10,['#ef7d57','#ffcd75','#b13e53'],50,110,-40);for(const e of G.enemies)if(!e.dead)e.kv=140;G.shake=6;sfx('lvl')}
@@ -422,9 +460,13 @@ function explode(x,y,r,dmg,kind){for(const e of G.enemies){if(e.dead)continue;co
 function doAttack(){const h=G.h,f=front();if(!f||f.x-f.hw-h.x>18)return;h.atkAnim=.15;const crit=Math.random()<G.st.crit;
  G.fx.push({k:'slash',life:.14,max:.14,crit,flip:h.flipS=!h.flipS});
  const tg=G.mods.cleave?G.enemies.filter(e=>!e.dead&&e.x-e.hw-h.x<=28):[f];for(const e of tg)dmgEnemy(e,G.st.atk,{crit,melee:true,kb:45});
+ if(hasR('ring')&&Math.random()<.2&&!f.dead){dmgEnemy(f,G.st.atk*1.5,{col:'bolt'});G.fx.push({k:'bolt',segs:[[f.x+rnd(-3,3),0,f.x,ecy(f)]],life:.15,max:.15});sfx('zap')}
  if(G.mods.shadow&&!f.dead){h.shT=.15;dmgEnemy(f,G.st.atk*.6,{col:'thorn'})}
  if(G.mods.wave){h.swc=(h.swc||0)+1;if(h.swc>=3){h.swc=0;G.proj.push({k:'wave',x:h.x+10,y:GY-9,hit:[],dmg:G.st.atk*3});sfx('blade',0)}}
  sfx(crit?'crit':'hit');if(crit){G.shake=Math.max(G.shake,2);G.hitstop=Math.max(G.hitstop,.03)}}
+function pickItem(it){const cur=SAVE.eq[it.slot],R=IRAR[it.rar];
+ if(iScore(it)>iScore(cur)){applyEq(cur,-1);SAVE.eq[it.slot]=it;applyEq(it,1);recalc();save();toast(`장착! [${R.n}] ${it.name}`);sfx('lvl');burst(G.h.x,GY-10,[R.c,'#f4f4f4'],20,70,-30)}
+ else{const sv=1+it.rar*2;SAVE.souls+=sv;save();addText('+'+sv+' SOUL',G.h.x,GY-30,'bolt');sfx('coin',0)}}
 function manualAtk(){const h=G.h;if(h.dead||state!=='play'||G.manT>0)return;G.manT=.13;G.atkPress=.1;const f=front();
  if(f&&f.x-f.hw-h.x<=18)doAttack();else{h.atkAnim=.15;G.fx.push({k:'slash',life:.14,max:.14,crit:false,flip:h.flipS=!h.flipS});sfx('blade',0)}}
 function useSkill(i){const sk=G.skills[i];if(!sk||G.h.dead||state!=='play')return;const D=SKILLS[sk.id];if(!D.cd){toast(D.name+'은(는) 항상 자동으로 돕니다');return}
@@ -482,6 +524,10 @@ function update(dt){G.time+=dt;const h=G.h;G.manT-=dt;G.atkPress-=dt;
   for(const sk of G.skills){if(sk.id==='blade')continue;sk.t-=dt;if(sk.t<=0&&!G.skillAuto)sk.t=0;else if(sk.t<=0){if(cast(sk)){sk.t=SKILLS[sk.id].cd(sk.lv)*(1-G.st.cdr);if(G.mods.echo&&Math.random()<G.mods.echo)sk.echo=.3}else sk.t=0}if(sk.echo>0){sk.echo-=dt;if(sk.echo<=0){sk.echo=0;if(cast(sk))addText('ECHO',G.h.x,GY-34,'bolt')}}}
   const bl=G.skills.find(s=>s.id==='blade');if(bl){const n=bl.lv+1;for(let i=0;i<n;i++){const a=G.time*4.2+i*Math.PI*2/n;const bx=h.x+Math.cos(a)*22,by=GY-9+Math.sin(a)*9;
     for(const e of G.enemies){if(e.dead||e.bladeT>0)continue;if(Math.abs(e.x-bx)<e.hw+3&&Math.abs(ecy(e)-by)<e.h/2+5){e.bladeT=.35;dmgEnemy(e,G.st.atk*G.st.sk*(.35+.13*bl.lv),{col:'blade',kb:15});sfx('blade',.06)}}}}}
+ if(hasR('guard')&&!h.dead){G.guardT-=dt;if(G.guardT<=0){G.guardT=8;G.shield=G.st.maxHp*.15}}
+ for(const d of G.drops){d.t+=dt;if(d.t<.7){d.vy+=260*dt;d.y+=d.vy*dt;if(d.y>GY-3){d.y=GY-3;d.vy*=-.4}if(G.walking)d.x-=WALK*dt}
+  else{d.x+=(h.x-d.x)*Math.min(1,dt*7);d.y+=(GY-10-d.y)*Math.min(1,dt*7);if(Math.abs(d.x-h.x)<4){d.dead=true;pickItem(d.it)}}}
+ G.drops=G.drops.filter(d=>!d.dead);
  if(G.walking)G.scroll+=WALK*dt;
  spawnLogic(dt);
  // enemies
@@ -544,6 +590,9 @@ function render(){const B=BIOMES[biomeOf(G.stage)],bg=genBiome(biomeOf(G.stage))
  const es=[...G.enemies].sort((a,b)=>b.x-a.x);
  for(const e of es)drawEnemy(e);
  drawHero();drawBl(false);
+ if(G.shield>0&&!G.h.dead){const a=.5+.3*Math.sin(G.time*6);ctx.globalAlpha=a;ring(G.h.x,GY-9,12,'#73eff7',1);ctx.globalAlpha=1}
+ for(const d of G.drops){const ic=icon(ISLOT[d.it.slot].icon),c=IRAR[d.it.rar].c,k='gl'+d.it.slot+d.it.rar,gl=SC[k]||(SC[k]=sil(ic.c,c));const bob=d.t>=.7?0:0,x=Math.round(d.x-4),y=Math.round(d.y-4+Math.sin(G.time*8)*1);
+  ctx.globalAlpha=.7;for(const[dx,dy]of[[-1,0],[1,0],[0,-1],[0,1]])ctx.drawImage(gl,x+dx,y+dy);ctx.globalAlpha=1;ctx.drawImage(ic.c,x,y);if(d.it.rar>=3&&Math.random()<.3)G.parts.push({x:d.x+rnd(-4,4),y:d.y+rnd(-4,4),vx:0,vy:-15,life:.4,c:c,s:1,g:0})}
  // projectiles
  for(const p of G.proj){if(p.k==='wave'){const x=Math.round(p.x);for(let i=-7;i<=7;i++){const o=Math.round(3-Math.sqrt(49-i*i)/2.3);ctx.fillStyle=Math.abs(i)<5?'#f4f4f4':'#73eff7';ctx.fillRect(x-o,Math.round(p.y)+i,2,1);ctx.fillStyle='#41a6f6';ctx.fillRect(x-o-2,Math.round(p.y)+i,1,1)}continue}
   if(p.k==='fire'){disc(ctx,p.x,p.y,2,'#ef7d57');ctx.fillStyle='#ffcd75';ctx.fillRect(Math.round(p.x)-1,Math.round(p.y)-1,2,2)}
@@ -597,7 +646,9 @@ function drawHUD(){const h=G.h,S=G.st;
  ctx.fillStyle='#1a1c2c';ctx.fillRect(0,PY,W,H-PY);ctx.fillStyle='#566c86';ctx.fillRect(0,PY,W,1);ctx.fillStyle='#333c57';ctx.fillRect(0,PY+1,W,1);
  // hp/xp
  const hpR=clamp(h.hp/S.maxHp,0,1);ctx.fillStyle='#333c57';ctx.fillRect(4,252,128,8);ctx.fillStyle=hpR<.3&&Math.floor(G.time*4)%2?'#ff4d6a':'#b13e53';ctx.fillRect(4,252,Math.ceil(128*hpR),8);ctx.fillStyle='#ef7d57';ctx.fillRect(4,252,Math.ceil(128*hpR),2);
+ if(G.shield>0){ctx.fillStyle='#73eff7';ctx.fillRect(4,252,Math.min(128,Math.ceil(128*G.shield/S.maxHp)),2)}
  txt(fmt(h.hp)+'/'+fmt(S.maxHp),68,253,'#f4f4f4',1,'c');
+ G.relics.forEach((r,i)=>{ctx.fillStyle='rgba(26,28,44,.7)';ctx.fillRect(2+i*12,25,11,11);ctx.drawImage(icon(RELICS[r].icon).c,3+i*12,26)});
  ctx.fillStyle='#333c57';ctx.fillRect(4,262,128,3);ctx.fillStyle='#73eff7';ctx.fillRect(4,262,Math.round(128*SAVE.xp/xpFor(SAVE.lv)),3);
  txt('LV'+SAVE.lv,156,256,'#73eff7',1,'c');
  // skill slots
@@ -641,7 +692,7 @@ function goTitle(){saveRun();state='title';newRun();G.scroll=rnd(360);show('ovTi
  $('titleInfo').innerHTML=`<b style="color:#73eff7">LV ${SAVE.lv}</b>${SAVE.job&&SAVE.job.b?' · '+JOBS[SAVE.job.b].t[SAVE.job.t-1].name:''}<br>`+(SAVE.rebirth?`<b style="color:#c46cf0">환생 ★${SAVE.rebirth} (+${Math.round(SAVE.rebirth*REBIRTH_B*100)}%)</b> · `:'')+`최고 기록 <b style="color:#ffcd75">STAGE ${SAVE.best}</b> · 영혼 <span class="soul">${SAVE.souls}</span>`}
 function resumeRun(){const r=loadRun();if(!r){startRun();return}initAudio();newRun();
  Object.assign(G,{stage:r.stage,gold:r.gold,runGold:r.runGold,skillAuto:r.skillAuto!==false,totalKills:r.totalKills,bossKills:r.bossKills,
-  up:r.up,mods:Object.assign(G.mods,r.mods),owned:new Set(r.owned),skills:r.skills.map(s=>({id:s.id,lv:s.lv,t:1})),revive:r.revive,rerolls:r.rerolls,
+  up:r.up,mods:Object.assign(G.mods,r.mods),owned:new Set(r.owned),skills:r.skills.map(s=>({id:s.id,lv:s.lv,t:1})),relics:r.relics||[],revive:r.revive,rerolls:r.rerolls,
   autoBuy:r.autoBuy,speed:r.speed||1,pendingLv:r.pendingLv||0,lvDelay:.8,time:r.time||0});
  G.st=null;recalc();G.h.hp=Math.max(1,G.st.maxHp*clamp(r.hpR,.05,1));
  if(isBoss(G.stage))G.bossDelay=1.6;state='play';show(null);banner('STAGE '+G.stage,'CONTINUE','#a7f070');sfx('lvl')}
@@ -683,6 +734,7 @@ function openPause(){if(state!=='play')return;state='pause';const S=G.st;
  $('pStats').innerHTML=`<div>공격력<b>${fmt(S.atk)}</b></div><div>최대 체력<b>${fmt(S.maxHp)}</b></div><div>공격 속도<b>${S.aspd.toFixed(2)}/s</b></div><div>치명타<b>${Math.round(S.crit*100)}%</b></div>
  <div>치명 피해<b>${Math.round(S.critDmg*100)}%</b></div><div>흡혈<b>${Math.round(S.ls*100)}%</b></div><div>재생<b>${(S.regen*100).toFixed(1)}%/s</b></div><div>골드 배율<b>×${S.gold.toFixed(2)}</b></div>
  <div style="grid-column:1/3">스킬 <b style="float:none;color:#73eff7">${sk}</b></div><div style="grid-column:1/3">특성 <b style="float:none;color:#c46cf0">${sp}</b></div><div style="grid-column:1/3">직업 <b style="float:none;color:#ffcd75">${SAVE.job.b?JOBS[SAVE.job.b].t[SAVE.job.t-1].name+' ('+SAVE.job.t+'차)':'없음 (Lv'+JOBLV[0]+' 전직)'}</b> · 환생 <b style="float:none;color:#c46cf0">★${SAVE.rebirth||0}</b></div>`;
+ $('pStats').innerHTML+=`<div style="grid-column:1/3">유물 <b style="float:none;color:#ef7d57">${G.relics.map(r=>RELICS[r].n).join(', ')||'없음 (보스 처치 시 획득)'}</b></div><div style="grid-column:1/3">장비 <b style="float:none">${Object.keys(ISLOT).map(k=>{const it=SAVE.eq[k];return it?`<span style="color:${IRAR[it.rar].c}">${it.name}</span>`:'—'}).join(' · ')}</b></div>`;
  $('bRebirth').style.display=G.stage>=REBIRTH_ST?'':'none';show('ovPause')}
 function endRun(reborn){clearRun();state='over';const souls=Math.floor((G.stage*1.5+G.bossKills*6+G.totalKills/8)*(reborn?2:1));if(reborn)SAVE.rebirth=(SAVE.rebirth||0)+1;$('oHd').textContent=reborn?'★ 환생 완료 ★':'사냥 종료';SAVE.souls+=souls;SAVE.runs++;if(G.stage>SAVE.best)SAVE.best=G.stage;save();
  $('oStats').innerHTML=`<div>도달 스테이지<b>${G.stage}</b></div><div>최고 기록<b>${SAVE.best}</b></div><div>처치 수<b>${G.totalKills}</b></div><div>보스 처치<b>${G.bossKills}</b></div><div>레벨<b>${SAVE.lv}</b></div><div>획득 골드<b>${fmt(G.runGold)}</b></div>${reborn?`<div style="grid-column:1/3;color:#c46cf0">환생 ★${SAVE.rebirth} · 공격력·체력·골드 +${Math.round(SAVE.rebirth*REBIRTH_B*100)}% 영구 적용</div>`:''}`;
@@ -696,6 +748,10 @@ function renderShop(){$('sSoul').textContent=SAVE.souls;const L=$('shopList');L.
   b.onclick=()=>{initAudio();if(SAVE.souls>=c&&!mx){SAVE.souls-=c;SAVE.meta[m.id]++;save();sfx('buy');renderShop()}};r.appendChild(b);L.appendChild(r)})}
 
 $('bStart').onclick=startRun;$('bCont').onclick=resumeRun;$('bRetry').onclick=startRun;
+function openEquip(){const L=$('equipList');L.innerHTML='';for(const k of Object.keys(ISLOT)){const S=ISLOT[k],it=SAVE.eq[k];const r=document.createElement('div');r.className='srow';
+ r.innerHTML=it?`<img src="${iconURL(S.icon)}" style="border:var(--u) solid ${IRAR[it.rar].c}"><div><div class="nm" style="color:${IRAR[it.rar].c}">${it.name}<span>${S.n} · ${IRAR[it.rar].n}</span></div><div class="ds">${[it.main,...it.opts].map(iLine).join('<br>')}</div></div>`
+  :`<img src="${iconURL(S.icon)}" style="opacity:.3"><div><div class="nm">${S.n}<span>비어 있음</span></div><div class="ds">몬스터를 사냥해 장비를 얻으세요</div></div>`;L.appendChild(r)}show('ovEquip')}
+$('bEquip1').onclick=()=>{initAudio();sfx('click');openEquip()};$('bEquipBack').onclick=()=>{sfx('click');goTitle()};
 $('bShop1').onclick=()=>{initAudio();sfx('click');openShop('ovTitle')};$('bShop2').onclick=()=>{sfx('click');openShop('ovOver')};
 $('bShopBack').onclick=()=>{sfx('click');if(shopBack==='ovTitle')goTitle();else show('ovOver')};
 $('bHome').onclick=()=>{sfx('click');goTitle()};
