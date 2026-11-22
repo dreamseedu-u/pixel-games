@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>우리 가족 포트리스</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root { --w: max(280px, min(96vw, calc((100vh - 300px) * 1.6), 1000px)); --f: calc(var(--w) / 480); }
+  @supports (height: 100dvh) { :root { --w: max(280px, min(96vw, calc((100dvh - 300px) * 1.6), 1000px)); } }
+  html, body { overscroll-behavior: none; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: 'Jua', 'Malgun Gothic', sans-serif;
+    background: linear-gradient(160deg, #d9f1ff 0%, #ffe9d6 100%);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 8px 6px 14px; color: #3d3247; user-select: none; -webkit-user-select: none;
+  }
+  .hud { display: flex; gap: 8px; width: var(--w); align-items: stretch; margin-bottom: 6px; }
+  .pl {
+    flex: 1; background: #fff; border-radius: 14px; padding: 6px 10px;
+    border: 3px solid transparent; transition: .25s; box-shadow: 0 3px 0 rgba(0,0,0,.08); min-width: 0;
+  }
+  .pl.active { border-color: #ff9f43; transform: scale(1.03); }
+  .pl .nm { font-size: clamp(14px, calc(15 * var(--f)), 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl .nm i { display: inline-block; width: .8em; height: .8em; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  .bar { height: clamp(8px, calc(10 * var(--f)), 16px); background: #eee; border-radius: 8px; overflow: hidden; margin-top: 4px; }
+  .bar b { display: block; height: 100%; width: 100%; background: #4cd16b; transition: width .5s, background .5s; }
+  .hpn { font-size: clamp(12px, calc(12 * var(--f)), 20px); color: #8a7f94; }
+  .wind {
+    flex: 0 0 auto; background: #fff; border-radius: 14px; padding: 6px 10px; text-align: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,.08); min-width: calc(86 * var(--f));
+    font-size: clamp(13px, calc(14 * var(--f)), 22px);
+  }
+  .wind .arr { font-size: clamp(16px, calc(18 * var(--f)), 28px); color: #3a8dde; letter-spacing: -2px; min-height: 1.2em; }
+  .msg { font-size: clamp(16px, calc(18 * var(--f)), 28px); min-height: 1.4em; margin-bottom: 4px; text-align: center; }
+  canvas {
+    width: var(--w); aspect-ratio: 1.6; border-radius: 14px; display: block; touch-action: none;
+    box-shadow: 0 5px 0 rgba(0,0,0,.15); background: #9fd8ff;
+  }
+  .ctrl { width: var(--w); display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+  .grp {
+    flex: 1 1 calc(var(--w) * .3); min-width: 150px; background: #fff; border-radius: 14px; padding: 6px;
+    display: flex; align-items: center; gap: 6px; box-shadow: 0 3px 0 rgba(0,0,0,.08);
+  }
+  .grp .lb { flex: 1; text-align: center; font-size: clamp(15px, calc(15 * var(--f)), 24px); line-height: 1.1; }
+  .grp .lb small { display: block; color: #8a7f94; font-size: .75em; }
+  .pbar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 3px; }
+  .pbar b { display: block; height: 100%; background: linear-gradient(90deg, #ffd56b, #ff6b6b); }
+  button {
+    font-family: inherit; border: none; border-radius: 12px; cursor: pointer; color: #3d3247;
+    background: #f1ecf7; box-shadow: 0 4px 0 rgba(0,0,0,.12); touch-action: manipulation;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  .grp button { width: clamp(44px, calc(46 * var(--f)), 70px); height: clamp(44px, calc(46 * var(--f)), 70px); font-size: clamp(18px, calc(20 * var(--f)), 30px); }
+  #fire {
+    flex: 1 1 calc(var(--w) * .25); min-width: 120px; min-height: clamp(56px, calc(58 * var(--f)), 84px);
+    font-size: clamp(22px, calc(24 * var(--f)), 36px); background: linear-gradient(180deg, #ff8a5c, #ff5e5e); color: #fff;
+    box-shadow: 0 5px 0 #c43f3f;
+  }
+  #fire:disabled { opacity: .45; }
+  .sub { display: flex; gap: 8px; margin-top: 10px; }
+  .sub button { font-size: clamp(14px, calc(14 * var(--f)), 22px); padding: 8px 14px; }
+  .help { width: var(--w); margin-top: 8px; font-size: clamp(13px, calc(13 * var(--f)), 20px); color: #8a7f94; text-align: center; line-height: 1.5; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+  .overlay.show { display: flex; }
+  .card { background: #fff; border-radius: 22px; padding: 22px 22px 18px; text-align: center; width: min(92vw, 380px); box-shadow: 0 8px 0 rgba(0,0,0,.15); }
+  .card h2 { margin: 0 0 6px; font-weight: normal; font-size: 30px; }
+  .card p { margin: 4px 0 14px; color: #8a7f94; font-size: 16px; }
+  .card .big { font-size: 56px; line-height: 1.1; }
+  .card label { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 18px; }
+  .card label i { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .card input { flex: 1; min-width: 0; font-family: inherit; font-size: 20px; padding: 8px 10px; border-radius: 10px; border: 2px solid #e4dcee; color: #3d3247; outline: none; }
+  .card input:focus { border-color: #ff9f43; }
+  .card .go { margin-top: 12px; width: 100%; padding: 12px; font-size: 24px; background: linear-gradient(180deg, #ff8a5c, #ff5e5e); color: #fff; box-shadow: 0 5px 0 #c43f3f; }
+</style>
+</head>
+<body>
+  <div class="hud">
+    <div class="pl" id="hud0"><div class="nm"><i style="background:#ff5e5e"></i><span id="n0"></span></div><div class="bar"><b id="hp0"></b></div><div class="hpn" id="hpn0"></div></div>
+    <div class="wind"><div>바람</div><div class="arr" id="windArr"></div></div>
+    <div class="pl" id="hud1"><div class="nm"><i style="background:#3a8dde"></i><span id="n1"></span></div><div class="bar"><b id="hp1"></b></div><div class="hpn" id="hpn1"></div></div>
+  </div>
+  <div class="msg" id="msg"></div>
+  <canvas id="cv"></canvas>
+  <div class="ctrl">
+    <div class="grp">
+      <button id="aDn">▼</button>
+      <div class="lb">각도<small id="aVal">45°</small></div>
+      <button id="aUp">▲</button>
+    </div>
+    <div class="grp">
+      <button id="pDn">−</button>
+      <div class="lb" style="min-width:60px">파워<small id="pVal">50</small><div class="pbar"><b id="pBar"></b></div></div>
+      <button id="pUp">＋</button>
+    </div>
+    <button id="fire">💥 발사!</button>
+  </div>
+  <div class="sub">
+    <button id="snd">🔊 소리 켜짐</button>
+    <button id="newGame">🔄 새 판</button>
+  </div>
+  <div class="help">화면을 끌어서 조준할 수도 있어요 · 바람 방향을 잘 보고 쏘세요!<br>키보드: ←→ 각도 · ↑↓ 파워 · 스페이스 발사</div>
+
+  <div class="overlay show" id="start">
+    <div class="card">
+      <div class="big">🚀</div>
+      <h2>우리 가족 포트리스</h2>
+      <p>번갈아 한 발씩! 상대 탱크를 먼저 맞히면 승리</p>
+      <label><i style="background:#ff5e5e"></i><input id="in0" maxlength="8" value="빨강 탱크"></label>
+      <label><i style="background:#3a8dde"></i><input id="in1" maxlength="8" value="파랑 탱크"></label>
+      <button class="go" id="startBtn">시작!</button>
+    </div>
+  </div>
+  <div class="overlay" id="over">
+    <div class="card">
+      <div class="big">🎉</div>
+      <h2 id="oTitle"></h2>
+      <p id="oSub"></p>
+      <button class="go" id="again">한 판 더!</button>
+    </div>
+  </div>
+
+<script>
+'use strict';
+const W = 800, H = 500, G = 0.15;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+cv.width = W * DPR; cv.height = H * DPR; ctx.scale(DPR, DPR);
+const $ = id => document.getElementById(id);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+const COLORS = [{ main: '#ff5e5e', dark: '#c43f3f' }, { main: '#3a8dde', dark: '#24609e' }];
+let ground = new Float32Array(W);
+let tanks = [], turn = 0, wind = 0, state = 'start';
+let proj = null, particles = [], texts = [], shake = 0, timer = 0, flyFrames = 0;
+let clouds = [];
+let names = ['빨강 탱크', '파랑 탱크'];
+let US = 1; // 작은 화면에서 캔버스 글자 키우기
+function calcUS() { const w = cv.getBoundingClientRect().width || W; US = clamp(W / w * 0.8, 1, 2); }
+window.addEventListener('resize', calcUS);
+
+// ---------- 소리
+let actx = null, soundOn = true;
+function audio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (actx && actx.state === 'suspended') actx.resume(); }
+function sndFire() {
+  if (!soundOn || !actx) return;
+  const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+  o.type = 'square'; o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(140, t + .25);
+  g.gain.setValueAtTime(.12, t); g.gain.exponentialRampToValueAtTime(.001, t + .25);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + .26);
+}
+function sndBoom(big) {
+  if (!soundOn || !actx) return;
+  const t = actx.currentTime, len = big ? .9 : .6;
+  const buf = actx.createBuffer(1, actx.sampleRate * len, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = buf; f.type = 'lowpass'; f.frequency.value = big ? 700 : 1000; g.gain.value = .5;
+  s.connect(f).connect(g).connect(actx.destination); s.start(t);
+}
+
+// ---------- 지형
+function genTerrain() {
+  const ws = [[rnd(25, 55), rnd(.005, .009), rnd(0, 6.3)], [rnd(10, 25), rnd(.015, .025), rnd(0, 6.3)], [rnd(3, 8), rnd(.05, .08), rnd(0, 6.3)]];
+  const hill = rnd(20, 110), hillW = rnd(110, 180);
+  for (let x = 0; x < W; x++) {
+    let y = 350;
+    for (const [a, f, p] of ws) y += a * Math.sin(f * x + p);
+    y -= hill * Math.exp(-Math.pow((x - W / 2) / hillW, 2));
+    ground[x] = clamp(y, 170, 460);
+  }
+}
+function flatten(cx, r) {
+  let s = 0, n = 0;
+  for (let x = cx - r; x <= cx + r; x++) if (x >= 0 && x < W) { s += ground[x]; n++; }
+  const avg = s / n;
+  for (let x = cx - r - 10; x <= cx + r + 10; x++) {
+    if (x < 0 || x >= W) continue;
+    const d = Math.abs(x - cx), k = d <= r ? 1 : 1 - (d - r) / 10;
+    ground[x] = ground[x] * (1 - k) + avg * k;
+  }
+}
+const gAt = x => ground[clamp(Math.round(x), 0, W - 1)];
+
+// ---------- 게임 흐름
+function newGame() {
+  genTerrain();
+  const x0 = Math.round(rnd(70, 170)), x1 = Math.round(W - rnd(70, 170));
+  flatten(x0, 18); flatten(x1, 18);
+  tanks = [
+    { x: x0, y: 0, vy: 0, hp: 100, shown: 100, ang: 45, pow: 60 },
+    { x: x1, y: 0, vy: 0, hp: 100, shown: 100, ang: 135, pow: 60 },
+  ];
+  for (const t of tanks) t.y = gAt(t.x);
+  clouds = Array.from({ length: 5 }, () => ({ x: rnd(0, W), y: rnd(30, 140), s: rnd(.7, 1.4) }));
+  particles = []; texts = []; proj = null;
+  turn = Math.random() < .5 ? 0 : 1;
+  $('over').classList.remove('show');
+  startTurn();
+}
+function startTurn() {
+  wind = Math.round(rnd(-5, 5));
+  state = 'aim';
+  updateUI();
+  setMsg(`${names[turn]} 차례! 🎯`);
+}
+function setMsg(s) { $('msg').textContent = s; }
+
+// 화면 표시용 각도(앞쪽 기준) <-> 실제 각도(오른쪽 0°)
+const dispAng = t => tanks.indexOf(t) === 0 ? t.ang : 180 - t.ang;
+function raise(d) {
+  const t = tanks[turn];
+  t.ang = clamp(turn === 0 ? t.ang + d : t.ang - d, 0, 180);
+  updateUI();
+}
+function addPow(d) { const t = tanks[turn]; t.pow = clamp(t.pow + d, 5, 100); updateUI(); }
+
+function updateUI() {
+  for (let i = 0; i < 2; i++) {
+    $('n' + i).textContent = names[i];
+    $('hud' + i).classList.toggle('active', i === turn && state !== 'over');
+    const hp = Math.max(0, tanks[i] ? tanks[i].hp : 100);
+    const b = $('hp' + i); b.style.width = hp + '%';
+    b.style.background = hp > 60 ? '#4cd16b' : hp > 30 ? '#ffb627' : '#ff5e5e';
+    $('hpn' + i).textContent = `체력 ${hp}`;
+  }
+  const t = tanks[turn];
+  if (t) {
+    $('aVal').textContent = Math.round(dispAng(t)) + '°';
+    $('pVal').textContent = Math.round(t.pow);
+    $('pBar').style.width = t.pow + '%';
+  }
+  const n = Math.abs(wind);
+  $('windArr').textContent = n === 0 ? '잔잔 ·' : (wind < 0 ? '◀'.repeat(n) : '▶'.repeat(n));
+  $('fire').disabled = state !== 'aim';
+}
+
+function barrelTip(t) {
+  const a = t.ang * Math.PI / 180;
+  return { x: t.x + Math.cos(a) * 22, y: t.y - 16 - Math.sin(a) * 22, a };
+}
+function fire() {
+  if (state !== 'aim') return;
+  audio();
+  const t = tanks[turn], tip = barrelTip(t), v = t.pow * 0.11;
+  proj = { x: tip.x, y: tip.y, vx: Math.cos(tip.a) * v, vy: -Math.sin(tip.a) * v, trail: [] };
+  flyFrames = 0;
+  state = 'fly';
+  sndFire();
+  for (let i = 0; i < 8; i++) particles.push({ x: tip.x, y: tip.y, vx: Math.cos(tip.a) * rnd(1, 3) + rnd(-1, 1), vy: -Math.sin(tip.a) * rnd(1, 3) + rnd(-1, 1), life: 20, max: 20, c: '#ddd', r: rnd(3, 6), g: 0 });
+  setMsg('슝~! 🚀');
+  updateUI();
+}
+
+function stepProj() {
+  proj.vx += wind * 0.0035;
+  proj.vy += G;
+  const sp = Math.hypot(proj.vx, proj.vy), n = Math.max(1, Math.ceil(sp / 2));
+  for (let i = 0; i < n; i++) {
+    proj.x += proj.vx / n; proj.y += proj.vy / n;
+    if (proj.x < -40 || proj.x > W + 40 || proj.y > H + 20) { miss(); return; }
+    for (let k = 0; k < 2; k++) {
+      const t = tanks[k];
+      if (k === turn && flyFrames < 8) continue;
+      if (Math.hypot(proj.x - t.x, proj.y - (t.y - 9)) < 14) { explode(proj.x, proj.y); return; }
+    }
+    if (proj.x >= 0 && proj.x < W && proj.y >= gAt(proj.x)) { explode(proj.x, proj.y); return; }
+  }
+  proj.trail.push({ x: proj.x, y: proj.y });
+  if (proj.trail.length > 22) proj.trail.shift();
+  flyFrames++;
+}
+function miss() {
+  proj = null; state = 'boom'; timer = 0;
+  setMsg('아쉽다~ 화면 밖으로 나갔어요 😅');
+}
+function explode(x, y) {
+  const R = 34;
+  proj = null; state = 'boom'; timer = 0;
+  for (let xi = Math.floor(x - R); xi <= Math.ceil(x + R); xi++) {
+    if (xi < 0 || xi >= W) continue;
+    const dx = xi - x; if (Math.abs(dx) > R) continue;
+    const bottom = y + Math.sqrt(R * R - dx * dx);
+    if (ground[xi] < bottom) ground[xi] = Math.min(H - 6, bottom);
+  }
+  let hitAny = false, msg = '';
+  tanks.forEach((t, k) => {
+    const d = Math.hypot(t.x - x, (t.y - 9) - y);
+    if (d < R + 12) {
+      const dmg = Math.max(5, Math.round(40 * (1 - d / (R + 12))));
+      t.hp = Math.max(0, t.hp - dmg); hitAny = true;
+      texts.push({ x: t.x, y: t.y - 40, s: '-' + dmg, c: COLORS[k].main, life: 70 });
+      if (k === turn) msg = msg || '앗! 내가 맞았어요 😵';
+      else msg = d < 16 ? '명중!! 💥🎯' : '맞혔다! 💥';
+    }
+  });
+  if (!hitAny) msg = '빗나갔어요~ 다음엔 맞힐 수 있어! 💪';
+  setMsg(msg);
+  shake = hitAny ? 14 : 8;
+  sndBoom(hitAny);
+  if (hitAny && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
+  for (let i = 0; i < 26; i++) {
+    const a = rnd(0, Math.PI * 2), s = rnd(1, 5);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, life: rnd(25, 45), max: 45, c: ['#ffd56b', '#ff9f43', '#ff5e5e', '#fff3b0'][i % 4], r: rnd(3, 7), g: .05 });
+  }
+  for (let i = 0; i < 18; i++) {
+    const a = rnd(Math.PI * 1.05, Math.PI * 1.95), s = rnd(2, 6);
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(40, 70), max: 70, c: ['#8b5a2b', '#6b4423', '#5cb85c'][i % 3], r: rnd(2, 4), g: .22, sq: true });
+  }
+  particles.push({ x, y, vx: 0, vy: 0, life: 14, max: 14, ring: true, r: 0 });
+  updateUI();
+}
+
+function settleTanks() {
+  let moving = false;
+  for (const t of tanks) {
+    const gy = gAt(t.x);
+    if (t.y < gy - .5) { t.vy += .35; t.y = Math.min(gy, t.y + t.vy); moving = true; }
+    else { t.y = gy; t.vy = 0; }
+  }
+  return moving;
+}
+
+function update() {
+  for (const c of clouds) { c.x += wind * 0.06 + 0.02; if (c.x > W + 80) c.x = -80; if (c.x < -80) c.x = W + 80; }
+  if (state === 'fly') stepProj();
+  const moving = settleTanks();
+  for (const p of particles) {
+    if (p.ring) { p.r += 5; } else { p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .98; }
+    p.life--;
+  }
+  particles = particles.filter(p => p.life > 0);
+  for (const t of texts) { t.y -= .6; t.life--; }
+  texts = texts.filter(t => t.life > 0);
+  for (const t of tanks) if (t.shown > t.hp) t.shown = Math.max(t.hp, t.shown - .8);
+  if (shake > 0) shake *= .85, shake < .5 && (shake = 0);
+  if (state === 'boom') {
+    timer++;
+    if (timer > 60 && !moving) {
+      const dead = tanks.findIndex(t => t.hp <= 0);
+      if (dead >= 0) return gameOver(dead);
+      turn = 1 - turn;
+      startTurn();
+    }
+  }
+}
+
+function gameOver(dead) {
+  state = 'over';
+  const both = tanks.every(t => t.hp <= 0);
+  const win = both ? -1 : 1 - dead;
+  updateUI();
+  setTimeout(() => {
+    $('oTitle').textContent = win < 0 ? '무승부!' : `${names[win]} 승리!`;
+    $('oSub').textContent = win < 0 ? '둘 다 쓰러졌어요 😂' : `남은 체력 ${tanks[win].hp} · 정말 잘했어요!`;
+    $('over').classList.add('show');
+  }, 900);
+  setMsg(win < 0 ? '무승부!' : `🏆 ${names[win]} 승리!`);
+}
+
+// ---------- 그리기
+function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
+function drawCloud(c) {
+  ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.s, c.s);
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.beginPath(); ctx.arc(0, 0, 20, 0, 7); ctx.arc(22, -8, 24, 0, 7); ctx.arc(46, 0, 18, 0, 7); ctx.arc(22, 6, 20, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawTank(t, k) {
+  if (t.hp <= 0 && state === 'over') { // 쓰러진 탱크
+    ctx.save(); ctx.translate(t.x, t.y); ctx.fillStyle = '#555';
+    rrect(-16, -8, 32, 8, 4); ctx.fill(); ctx.fillStyle = '#777'; rrect(-12, -13, 24, 6, 3); ctx.fill();
+    ctx.restore(); return;
+  }
+  const col = COLORS[k], a = t.ang * Math.PI / 180;
+  ctx.save(); ctx.translate(t.x, t.y);
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(Math.cos(a) * 22, -16 - Math.sin(a) * 22); ctx.stroke();
+  ctx.fillStyle = '#3d3d4a'; rrect(-17, -8, 34, 9, 4.5); ctx.fill();
+  ctx.fillStyle = '#9a9aa8'; for (let i = -12; i <= 12; i += 8) { ctx.beginPath(); ctx.arc(i, -3.5, 2.5, 0, 7); ctx.fill(); }
+  ctx.fillStyle = col.main; rrect(-14, -15, 28, 9, 4); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -15, 9, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(-3, -18, 3, 0, 7); ctx.fill();
+  ctx.fillStyle = col.dark; ctx.fillRect(-14, -8.5, 28, 2);
+  ctx.restore();
+  // 이름 + 체력바
+  const bw = 44 * US, by = t.y - 30 - 14 * US;
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; rrect(t.x - bw / 2 - 1, by - 1, bw + 2, 6 * US + 2, 4); ctx.fill();
+  ctx.fillStyle = '#fff'; rrect(t.x - bw / 2, by, bw, 6 * US, 3); ctx.fill();
+  ctx.fillStyle = '#ffb3b3'; rrect(t.x - bw / 2, by, bw * Math.max(0, t.shown) / 100, 6 * US, 3); ctx.fill();
+  ctx.fillStyle = t.hp > 60 ? '#4cd16b' : t.hp > 30 ? '#ffb627' : '#ff5e5e';
+  rrect(t.x - bw / 2, by, bw * Math.max(0, t.hp) / 100, 6 * US, 3); ctx.fill();
+  ctx.font = `${14 * US}px Jua, sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * US; ctx.strokeStyle = 'rgba(255,255,255,.85)';
+  ctx.strokeText(names[k], t.x, by - 5); ctx.fillStyle = col.dark; ctx.fillText(names[k], t.x, by - 5);
+  // 차례 표시
+  if (k === turn && (state === 'aim' || state === 'fly')) {
+    const bob = Math.sin(performance.now() / 180) * 4, ay = by - 16 - 14 * US + bob;
+    ctx.fillStyle = '#ff9f43'; ctx.beginPath(); ctx.moveTo(t.x - 9 * US, ay); ctx.lineTo(t.x + 9 * US, ay); ctx.lineTo(t.x, ay + 11 * US); ctx.closePath(); ctx.fill();
+  }
+}
+function drawAim() {
+  const t = tanks[turn], tip = barrelTip(t), v = t.pow * 0.11;
+  let x = tip.x, y = tip.y, vx = Math.cos(tip.a) * v, vy = -Math.sin(tip.a) * v;
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  for (let i = 0; i < 26; i++) {
+    for (let s = 0; s < 2; s++) { vy += G; x += vx; y += vy; }
+    if (y > gAt(x)) break;
+    ctx.globalAlpha = 1 - i / 26;
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function draw() {
+  ctx.save();
+  if (shake) ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#7cc8ff'); sky.addColorStop(1, '#e3f5ff');
+  ctx.fillStyle = sky; ctx.fillRect(-20, -20, W + 40, H + 40);
+  ctx.fillStyle = '#fff1a8'; ctx.beginPath(); ctx.arc(690, 70, 34, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,241,168,.35)'; ctx.beginPath(); ctx.arc(690, 70, 48, 0, 7); ctx.fill();
+  clouds.forEach(drawCloud);
+  // 먼 산
+  ctx.fillStyle = '#b8dcc0';
+  ctx.beginPath(); ctx.moveTo(0, H);
+  for (let x = 0; x <= W; x += 20) ctx.lineTo(x, 300 + 40 * Math.sin(x * .011) + 20 * Math.sin(x * .027 + 1));
+  ctx.lineTo(W, H); ctx.fill();
+  // 땅
+  const dirt = ctx.createLinearGradient(0, 200, 0, H);
+  dirt.addColorStop(0, '#b07a45'); dirt.addColorStop(1, '#6b4423');
+  ctx.fillStyle = dirt;
+  ctx.beginPath(); ctx.moveTo(0, H + 20); ctx.lineTo(0, ground[0]);
+  for (let x = 1; x < W; x++) ctx.lineTo(x, ground[x]);
+  ctx.lineTo(W, ground[W - 1]); ctx.lineTo(W, H + 20); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#5cb85c'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(0, ground[0] + 2);
+  for (let x = 1; x < W; x++) ctx.lineTo(x, ground[x] + 2);
+  ctx.stroke();
+  ctx.strokeStyle = '#7fd67f'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, ground[0]);
+  for (let x = 1; x < W; x++) ctx.lineTo(x, ground[x]);
+  ctx.stroke();
+
+  if (state === 'aim') drawAim();
+  tanks.forEach(drawTank);
+
+  if (proj) {
+    proj.trail.forEach((p, i) => {
+      ctx.fillStyle = `rgba(255,190,90,${i / proj.trail.length * .7})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2 + i / proj.trail.length * 3, 0, 7); ctx.fill();
+    });
+    ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(proj.x, proj.y, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd56b'; ctx.beginPath(); ctx.arc(proj.x - 1.5, proj.y - 1.5, 2.5, 0, 7); ctx.fill();
+  }
+  for (const p of particles) {
+    const al = Math.max(0, p.life / p.max);
+    if (p.ring) { ctx.strokeStyle = `rgba(255,255,255,${al})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.stroke(); continue; }
+    ctx.globalAlpha = al; ctx.fillStyle = p.c;
+    if (p.sq) ctx.fillRect(p.x - p.r / 2, p.y - p.r / 2, p.r, p.r);
+    else { ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.5 + al / 2), 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = `${26 * US}px Jua, sans-serif`; ctx.textAlign = 'center';
+  for (const t of texts) {
+    ctx.globalAlpha = Math.min(1, t.life / 30);
+    ctx.lineWidth = 5; ctx.strokeStyle = '#fff'; ctx.strokeText(t.s, t.x, t.y);
+    ctx.fillStyle = t.c; ctx.fillText(t.s, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function loop() { if (state !== 'start') update(); draw(); requestAnimationFrame(loop); }
+
+// ---------- 조작
+function hold(btn, fn) {
+  let to = null, iv = null;
+  const stop = () => { clearTimeout(to); clearInterval(iv); to = iv = null; };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault(); audio(); if (state !== 'aim') return;
+    fn(); stop(); to = setTimeout(() => { iv = setInterval(() => state === 'aim' ? fn() : stop(), 45); }, 320);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+hold($('aUp'), () => raise(1));
+hold($('aDn'), () => raise(-1));
+hold($('pUp'), () => addPow(1));
+hold($('pDn'), () => addPow(-1));
+$('fire').addEventListener('click', fire);
+
+// 화면 끌어서 조준
+let dragging = false;
+function aimAt(e) {
+  const r = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width * W, py = (e.clientY - r.top) / r.height * H;
+  const t = tanks[turn], dx = px - t.x, dy = (t.y - 16) - py;
+  let a = Math.atan2(dy, dx) * 180 / Math.PI;
+  if (a < 0) a = dx >= 0 ? 0 : 180;
+  t.ang = Math.round(a);
+  t.pow = Math.round(clamp(Math.hypot(dx, dy) / 3.2, 5, 100));
+  updateUI();
+}
+cv.addEventListener('pointerdown', e => { audio(); if (state !== 'aim') return; dragging = true; cv.setPointerCapture(e.pointerId); aimAt(e); });
+cv.addEventListener('pointermove', e => { if (dragging && state === 'aim') aimAt(e); });
+['pointerup', 'pointercancel'].forEach(ev => cv.addEventListener(ev, () => dragging = false));
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') { if (e.key === 'Enter' && $('start').classList.contains('show')) $('startBtn').click(); return; }
+  if (state !== 'aim') return;
+  const big = e.shiftKey ? 5 : 1;
+  if (e.key === 'ArrowLeft') raise(turn === 0 ? big : -big);
+  else if (e.key === 'ArrowRight') raise(turn === 0 ? -big : big);
+  else if (e.key === 'ArrowUp') addPow(big);
+  else if (e.key === 'ArrowDown') addPow(-big);
+  else if (e.key === ' ' || e.key === 'Enter') fire();
+  else return;
+  e.preventDefault();
+});
+
+$('startBtn').addEventListener('click', () => {
+  audio();
+  names = [$('in0').value.trim() || '빨강 탱크', $('in1').value.trim() || '파랑 탱크'];
+  try { localStorage.setItem('fortressNames', JSON.stringify(names)); } catch (e) {}
+  $('start').classList.remove('show');
+  newGame();
+});
+$('again').addEventListener('click', newGame);
+$('newGame').addEventListener('click', () => { if (state === 'start') return; newGame(); });
+$('snd').addEventListener('click', () => {
+  soundOn = !soundOn; $('snd').textContent = soundOn ? '🔊 소리 켜짐' : '🔇 소리 꺼짐';
+  try { localStorage.setItem('fortressSound', soundOn ? '1' : '0'); } catch (e) {}
+});
+try {
+  const n = JSON.parse(localStorage.getItem('fortressNames') || 'null');
+  if (Array.isArray(n) && n.length === 2) { $('in0').value = n[0]; $('in1').value = n[1]; }
+  if (localStorage.getItem('fortressSound') === '0') { soundOn = false; $('snd').textContent = '🔇 소리 꺼짐'; }
+} catch (e) {}
+
+// 시작 화면 뒤 배경
+genTerrain();
+tanks = [{ x: 120, y: 0, hp: 100, shown: 100, ang: 45, pow: 60, vy: 0 }, { x: 680, y: 0, hp: 100, shown: 100, ang: 135, pow: 60, vy: 0 }];
+flatten(120, 18); flatten(680, 18); tanks.forEach(t => t.y = gAt(t.x));
+clouds = Array.from({ length: 5 }, () => ({ x: rnd(0, W), y: rnd(30, 140), s: rnd(.7, 1.4) }));
+updateUI();
+calcUS();
+loop();
+</script>
+</body>
+</html>
