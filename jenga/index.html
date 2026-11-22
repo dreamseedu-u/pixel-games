@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>우리 가족 젠가</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: 'Jua', 'Malgun Gothic', sans-serif; color: #4a3b2f;
+    background: linear-gradient(160deg, #fff6d6 0%, #ffe0ec 100%);
+    display: flex; flex-direction: column; align-items: center;
+    height: 100dvh; padding: 10px 10px 14px; user-select: none;
+  }
+  .wrap { width: 100%; max-width: 900px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  h1 { margin: 2px 0 8px; font-size: clamp(22px, 3.2vh, 36px); font-weight: normal; text-align: center; }
+  .players { display: flex; gap: 6px; align-items: stretch; }
+  .player {
+    flex: 1; background: #fff; border-radius: 16px; padding: 8px 8px;
+    border: 4px solid transparent; transition: .25s; box-shadow: 0 3px 0 rgba(0,0,0,.08);
+    display: flex; align-items: center; gap: 4px; min-width: 0;
+  }
+  .player.active { border-color: #ff9f43; transform: scale(1.03); }
+  .player .ico { font-size: clamp(20px, min(3.5vh, 6vw), 36px); }
+  .player input {
+    width: 100%; min-width: 0; border: none; outline: none; background: transparent;
+    font-family: inherit; color: #4a3b2f; font-size: clamp(15px, min(2.4vh, 4.2vw), 26px);
+  }
+  .counter {
+    background: #fff; border-radius: 16px; padding: 4px 8px; text-align: center;
+    box-shadow: 0 3px 0 rgba(0,0,0,.08); font-size: clamp(13px, 1.8vh, 18px);
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .counter b { font-size: clamp(22px, 3.2vh, 34px); font-weight: normal; }
+  .msg { text-align: center; font-size: clamp(17px, 2.5vh, 28px); margin: 8px 0; min-height: 1.4em; }
+  #stage {
+    flex: 1; min-height: 0; border-radius: 18px; overflow: hidden; position: relative;
+    box-shadow: 0 5px 0 rgba(0,0,0,.1); touch-action: none; background: #fff3dc;
+  }
+  #stage canvas { width: 100% !important; height: 100% !important; display: block; }
+  .buttons { display: flex; gap: 10px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
+  button {
+    font-family: inherit; font-size: clamp(16px, 2.3vh, 24px); border: none; border-radius: 14px;
+    padding: 10px 18px; background: #fff; color: #4a3b2f; cursor: pointer; box-shadow: 0 4px 0 rgba(0,0,0,.12);
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  .help { text-align: center; font-size: clamp(13px, 1.8vh, 18px); opacity: .75; margin-top: 8px; line-height: 1.5; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 10; }
+  .overlay.show { display: flex; }
+  .card { background: #fff; border-radius: 24px; padding: 26px 30px; text-align: center; max-width: 85vw; animation: pop .4s; }
+  .card .big { font-size: 52px; }
+  .card h2 { margin: 6px 0; font-weight: normal; font-size: 30px; }
+  .card p { font-size: 19px; margin: 8px 0 18px; }
+  .card button { background: #ff9f43; color: #fff; }
+  @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧱 우리 가족 젠가 🧱</h1>
+  <div class="players">
+    <div class="player" id="p0"><span class="ico">🐢</span><input id="name0" value="엄마아빠" maxlength="8"></div>
+    <div class="counter">뺀 블록<b id="count">0</b></div>
+    <div class="player" id="p1"><span class="ico">🐰</span><input id="name1" value="우리 아이" maxlength="8"></div>
+  </div>
+  <div class="msg" id="msg">불러오는 중...</div>
+  <div id="stage"><div class="loading" id="loading">탑 쌓는 중... 🧱</div></div>
+  <div class="buttons">
+    <button id="turnCam">🔄 옆으로 돌리기</button>
+    <button id="reset">🧱 새 게임</button>
+  </div>
+  <div class="help">블록을 한 번 누르면 노랗게, 한 번 더 누르면 쏙! 빠져서 맨 위에 올라가요.<br>화면을 끌면 탑을 돌려 볼 수 있어요. 탑을 무너뜨리면 져요!</div>
+</div>
+
+<div class="overlay" id="over">
+  <div class="card">
+    <div class="big">💥</div>
+    <h2 id="oTitle"></h2>
+    <p id="oText"></p>
+    <button id="again">한 판 더!</button>
+  </div>
+</div>
+
+<script type="module">
+  import './game.js';
+  document.getElementById('loading')?.remove();
+</script>
+</body>
+</html>
