@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>우리 가족 오델로</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: 'Jua', 'Malgun Gothic', sans-serif;
+    background: linear-gradient(160deg, #fff6d6 0%, #ffe0ec 100%);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 14px 10px 24px; color: #4a3b2f;
+    user-select: none;
+  }
+  h1 { margin: 4px 0 10px; font-size: 26px; font-weight: normal; }
+  .players { display: flex; gap: 10px; width: 100%; max-width: 480px; margin-bottom: 10px; }
+  .player {
+    flex: 1; background: #fff; border-radius: 18px; padding: 10px;
+    display: flex; align-items: center; gap: 10px;
+    border: 4px solid transparent; transition: .25s;
+    box-shadow: 0 3px 0 rgba(0,0,0,.08);
+  }
+  .player.active { border-color: #ff9f43; transform: scale(1.04); }
+  .player .chip { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; }
+  .player.black .chip { background: radial-gradient(circle at 35% 30%, #666, #111); }
+  .player.white .chip { background: radial-gradient(circle at 35% 30%, #fff, #ccc); border: 2px solid #bbb; }
+  .player input {
+    width: 100%; border: none; font-family: inherit; font-size: 16px;
+    color: #4a3b2f; background: transparent; outline: none;
+  }
+  .player .score { font-size: 30px; }
+  .msg { font-size: 20px; min-height: 30px; margin-bottom: 8px; text-align: center; }
+  .board {
+    width: min(94vw, 480px); aspect-ratio: 1;
+    background: #2e9e5b; border-radius: 16px; padding: 6px;
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px;
+    box-shadow: 0 6px 0 #1f6e3f;
+  }
+  .cell {
+    background: #3cb371; border-radius: 6px; position: relative;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .disc {
+    width: 84%; height: 84%; border-radius: 50%;
+    transition: transform .35s, background .35s;
+  }
+  .disc.b { background: radial-gradient(circle at 35% 30%, #666, #111); }
+  .disc.w { background: radial-gradient(circle at 35% 30%, #fff, #d4d4d4); }
+  .disc.pop { animation: pop .3s; }
+  .disc.flip { animation: flip .4s; }
+  @keyframes pop { 0% { transform: scale(0); } 80% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  @keyframes flip { 0% { transform: rotateY(0); } 50% { transform: rotateY(90deg); } 100% { transform: rotateY(0); } }
+  .hint {
+    width: 30%; height: 30%; border-radius: 50%;
+    background: rgba(255,255,255,.55); animation: blink 1.4s infinite;
+  }
+  .hint.b { background: rgba(0,0,0,.35); }
+  @keyframes blink { 50% { transform: scale(.7); opacity: .5; } }
+  .last::after {
+    content: ''; position: absolute; width: 14%; height: 14%;
+    background: #ff5e5e; border-radius: 50%;
+  }
+  .buttons { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  button {
+    font-family: inherit; font-size: 18px; border: none; border-radius: 14px;
+    padding: 10px 18px; background: #fff; color: #4a3b2f; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,.12);
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  button.on { background: #ffd56b; }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    display: none; align-items: center; justify-content: center; z-index: 10;
+  }
+  .overlay.show { display: flex; }
+  .card {
+    background: #fff; border-radius: 24px; padding: 26px 30px; text-align: center;
+    max-width: 85vw; animation: pop .4s;
+  }
+  .card .big { font-size: 48px; }
+  .card h2 { margin: 6px 0; font-weight: normal; font-size: 28px; }
+  .card p { font-size: 20px; margin: 8px 0 18px; }
+  .card button { background: #ff9f43; color: #fff; }
+  .help { max-width: 480px; font-size: 15px; margin-top: 14px; line-height: 1.6; text-align: center; opacity: .8; }
+</style>
+</head>
+<body>
+  <h1>🐢 우리 가족 오델로 🐰</h1>
+
+  <div class="players">
+    <div class="player black" id="pB">
+      <div class="chip"></div>
+      <div style="flex:1;min-width:0">
+        <input id="nameB" value="엄마아빠" maxlength="8">
+        <div class="score" id="sB">2</div>
+      </div>
+    </div>
+    <div class="player white" id="pW">
+      <div class="chip"></div>
+      <div style="flex:1;min-width:0">
+        <input id="nameW" value="우리 아이" maxlength="8">
+        <div class="score" id="sW">2</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <div class="board" id="board"></div>
+
+  <div class="buttons">
+    <button id="undo">↩️ 무르기</button>
+    <button id="hintBtn" class="on">💡 힌트 켜짐</button>
+    <button id="reset">🔄 새 게임</button>
+  </div>
+
+  <div class="help">
+    상대 돌을 내 돌 사이에 끼우면 내 색으로 바뀌어요!<br>
+    반짝이는 점이 둘 수 있는 자리예요. 이름은 눌러서 바꿀 수 있어요.
+  </div>
+
+  <div class="overlay" id="over">
+    <div class="card">
+      <div class="big" id="oBig">🎉</div>
+      <h2 id="oTitle"></h2>
+      <p id="oText"></p>
+      <button id="again">한 판 더!</button>
+    </div>
+  </div>
+
+<script>
+const N = 8, DIRS = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const boardEl = document.getElementById('board');
+const msgEl = document.getElementById('msg');
+let board, turn, history, showHint = true, last = null, flipped = [], placed = null;
+
+const nameOf = c => (document.getElementById(c === 'b' ? 'nameB' : 'nameW').value.trim() || (c === 'b' ? '검은 돌' : '흰 돌'));
+const other = c => c === 'b' ? 'w' : 'b';
+
+function init() {
+  board = Array.from({length: N}, () => Array(N).fill(null));
+  board[3][3] = 'w'; board[4][4] = 'w'; board[3][4] = 'b'; board[4][3] = 'b';
+  turn = 'b'; history = []; last = null; flipped = []; placed = null;
+  document.getElementById('over').classList.remove('show');
+  render('');
+}
+
+function flipsFor(r, c, color, b = board) {
+  if (b[r][c]) return [];
+  let all = [];
+  for (const [dr, dc] of DIRS) {
+    let line = [], i = r + dr, j = c + dc;
+    while (i >= 0 && i < N && j >= 0 && j < N && b[i][j] === other(color)) {
+      line.push([i, j]); i += dr; j += dc;
+    }
+    if (line.length && i >= 0 && i < N && j >= 0 && j < N && b[i][j] === color) all = all.concat(line);
+  }
+  return all;
+}
+
+function validMoves(color) {
+  const m = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++)
+    if (flipsFor(r, c, color).length) m.push([r, c]);
+  return m;
+}
+
+function count() {
+  let b = 0, w = 0;
+  board.flat().forEach(x => { if (x === 'b') b++; else if (x === 'w') w++; });
+  return {b, w};
+}
+
+function play(r, c) {
+  const f = flipsFor(r, c, turn);
+  if (!f.length) return;
+  history.push({board: board.map(row => row.slice()), turn, last});
+  board[r][c] = turn;
+  f.forEach(([i, j]) => board[i][j] = turn);
+  last = [r, c]; placed = [r, c]; flipped = f;
+  const gained = f.length;
+  const me = turn;
+  turn = other(turn);
+  let note = `${nameOf(me)} 돌 ${gained}개 뒤집기! 👏`;
+  if (!validMoves(turn).length) {
+    if (!validMoves(other(turn)).length) { render(note); return finish(); }
+    note = `${nameOf(turn)}은(는) 둘 곳이 없어서 한 번 쉬어요 😴`;
+    turn = other(turn);
+  }
+  render(note);
+}
+
+function finish() {
+  const {b, w} = count();
+  const t = document.getElementById('oTitle'), x = document.getElementById('oText'), big = document.getElementById('oBig');
+  if (b === w) { big.textContent = '🤝'; t.textContent = '무승부!'; x.textContent = `${b} 대 ${w}, 둘 다 최고예요!`; }
+  else {
+    const win = b > w ? 'b' : 'w';
+    big.textContent = '🏆';
+    t.textContent = `${nameOf(win)} 승리!`;
+    x.textContent = `${Math.max(b,w)} 대 ${Math.min(b,w)} · 정말 잘했어요!`;
+  }
+  setTimeout(() => document.getElementById('over').classList.add('show'), 500);
+}
+
+function render(note) {
+  boardEl.innerHTML = '';
+  const moves = validMoves(turn).map(([r, c]) => r * N + c);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    const v = board[r][c];
+    if (v) {
+      const d = document.createElement('div');
+      d.className = 'disc ' + v;
+      if (placed && placed[0] === r && placed[1] === c) d.classList.add('pop');
+      else if (flipped.some(([i, j]) => i === r && j === c)) d.classList.add('flip');
+      cell.appendChild(d);
+      if (last && last[0] === r && last[1] === c) cell.classList.add('last');
+    } else if (showHint && moves.includes(r * N + c)) {
+      const h = document.createElement('div');
+      h.className = 'hint ' + turn;
+      cell.appendChild(h);
+    }
+    cell.onclick = () => {
+      if (flipsFor(r, c, turn).length) play(r, c);
+      else if (!board[r][c]) { msgEl.textContent = '여기는 둘 수 없어요 🙅 반짝이는 곳을 찾아봐요!'; }
+    };
+    boardEl.appendChild(cell);
+  }
+  placed = null; flipped = [];
+  const {b, w} = count();
+  document.getElementById('sB').textContent = b;
+  document.getElementById('sW').textContent = w;
+  document.getElementById('pB').classList.toggle('active', turn === 'b');
+  document.getElementById('pW').classList.toggle('active', turn === 'w');
+  msgEl.textContent = note || `${nameOf(turn)} 차례예요! ${turn === 'b' ? '⚫' : '⚪'}`;
+  if (note) setTimeout(() => { if (msgEl.textContent === note && !document.getElementById('over').classList.contains('show')) msgEl.textContent = `${nameOf(turn)} 차례예요! ${turn === 'b' ? '⚫' : '⚪'}`; }, 1800);
+}
+
+document.getElementById('undo').onclick = () => {
+  if (!history.length) { msgEl.textContent = '더 무를 수 없어요!'; return; }
+  const h = history.pop();
+  board = h.board; turn = h.turn; last = h.last;
+  document.getElementById('over').classList.remove('show');
+  render('한 수 물렀어요 ↩️');
+};
+document.getElementById('hintBtn').onclick = e => {
+  showHint = !showHint;
+  e.target.textContent = showHint ? '💡 힌트 켜짐' : '💡 힌트 꺼짐';
+  e.target.classList.toggle('on', showHint);
+  render('');
+};
+document.getElementById('reset').onclick = init;
+document.getElementById('again').onclick = init;
+['nameB', 'nameW'].forEach(id => document.getElementById(id).addEventListener('input', () => render('')));
+
+init();
+</script>
+</body>
+</html>
