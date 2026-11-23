@@ -105,6 +105,21 @@ font-size:calc(var(--u)*6);padding:calc(var(--u)*2) calc(var(--u)*6);background:
 .card.r2::after,.card.r3::after{content:"";position:absolute;top:0;bottom:0;width:30%;left:-40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.18),transparent);animation:shine 2.2s ease-in-out infinite}
 @keyframes shine{0%{left:-40%}60%,100%{left:120%}}
 #toast{background:linear-gradient(180deg,rgba(43,49,80,.95),rgba(20,22,36,.95));box-shadow:0 0 0 var(--u) #ffcd75,0 calc(var(--u)*2) calc(var(--u)*6) rgba(0,0,0,.5)}
+/* ===== item compare ===== */
+.cmp{display:flex;align-items:stretch;gap:calc(var(--u)*3);width:100%}
+.cmpc{flex:1;display:flex;flex-direction:column;align-items:center;gap:var(--u);padding:calc(var(--u)*3) calc(var(--u)*2);background:linear-gradient(180deg,#262b48,#1a1d30);box-shadow:0 0 0 var(--u) #0d0e17,0 0 0 calc(var(--u)*1.6) #566c86}
+.cmpc.nw{background:radial-gradient(circle at 50% 30%,rgba(255,205,117,.25),#1a1d30 70%);box-shadow:0 0 0 var(--u) #0d0e17,0 0 0 calc(var(--u)*1.6) #ffcd75,0 0 calc(var(--u)*6) rgba(255,205,117,.5)}
+.cmpl{font-size:calc(var(--u)*4.2);font-weight:800;color:#c8d3e0}.cmpc.nw .cmpl{color:#ffcd75}
+.cmpc img{width:calc(var(--u)*22);height:calc(var(--u)*22);image-rendering:pixelated;background:#141522;box-shadow:0 0 0 var(--u) var(--rc),0 0 calc(var(--u)*4) var(--rc);padding:calc(var(--u)*2)}
+.cmpn{font-size:calc(var(--u)*5.5);font-weight:900;text-align:center;text-shadow:0 var(--u) 0 #0d0e17}.cmpr{font-size:calc(var(--u)*4);color:#94b0c2}
+.cmps{font-size:calc(var(--u)*4.2);color:#c8d3e0}.cmps b{color:#fff}
+.vs{align-self:center;font-size:calc(var(--u)*7);font-weight:900;color:#ff4d6a;text-shadow:0 var(--u) 0 #0d0e17}
+.ctab{width:100%;border-collapse:collapse;font-size:calc(var(--u)*4.6);background:#141522;box-shadow:0 0 0 var(--u) #333c57}
+.ctab th{background:#262b48;color:#ffcd75;padding:calc(var(--u)*1.8);font-weight:800}
+.ctab td{padding:calc(var(--u)*1.6) calc(var(--u)*1.8);text-align:center;border-top:calc(var(--u)*.5) solid #262b48;color:#e4e9f0}
+.ctab td:first-child{text-align:left;color:#c8d3e0}
+.ctab .up{color:#a7f070;font-weight:800}.ctab .dn{color:#ff6b7a;font-weight:800}.ctab .eq{color:#94b0c2}
+.ctab tr.tot td{background:#1d2440;font-weight:900;color:#fff}
 /* ===== live content ===== */
 .ci{width:1.15em;height:1.15em;vertical-align:-.18em;image-rendering:pixelated}
 .chip .ci{margin-right:var(--u)}
@@ -257,7 +272,7 @@ display:flex;flex-direction:column;align-items:center;justify-content:center;gap
 
   <div class="ov" id="ovEquip">
     <div class="hd">장비</div>
-    <div class="sub">몬스터·보스가 떨어뜨린 장비 중 더 좋은 것을 자동 장착합니다<br>약한 장비는 영혼으로 바뀝니다</div>
+    <div class="sub">더 좋은 장비가 나오면 비교표를 보고 교체할지 고를 수 있어요<br>기존보다 약한 장비는 자동으로 영혼으로 바뀝니다</div>
     <div class="shoplist" id="equipList"></div>
     <button class="btn" id="bEquipBack">돌아가기</button>
   </div>
@@ -276,6 +291,11 @@ display:flex;flex-direction:column;align-items:center;justify-content:center;gap
     <div class="shoplist" id="shopList"></div>
     <button class="btn" id="bShopBack">돌아가기</button>
   </div>
+  <div class="ov" id="ovItem"><div class="hd">새 장비 발견!</div><div class="sub" id="itSub"></div>
+    <div class="cmp"><div class="cmpc" id="itOld"></div><div class="vs">VS</div><div class="cmpc nw" id="itNew"></div></div>
+    <table class="ctab" id="itTab"></table>
+    <div class="row"><button class="btn gold" id="itEq" style="min-width:0;flex:1">교체하기</button><button class="btn gray" id="itKeep" style="min-width:0;flex:1">기존 유지</button></div>
+    <div class="sub" id="itNote" style="font-size:calc(var(--u)*4.4)"></div></div>
   <div class="ov" id="ovDg"><div class="hd">던전</div><div class="dtabs" id="dgTabs"></div><div class="dpanel" id="dgPanel"></div><button class="btn gray" id="bDgBack">돌아가기</button></div>
   <div class="ov" id="ovDgEnd"><div class="hd" id="deHd">클리어!</div><div class="sub" id="deSub"></div><div class="sec" style="text-align:center">획득 보상</div><div class="rewrow" id="deRew"></div>
     <button class="btn gold" id="deNext"></button><div class="row"><button class="btn sm" id="deList">던전 목록</button><button class="btn sm gray" id="deHome">타이틀로</button></div></div>
@@ -862,9 +882,26 @@ function doAttack(){const h=G.h,f=front();if(!f||f.x-f.hw-h.x>18)return;h.atkAni
  sfx(crit?'crit':'hit');if(crit){G.shake=Math.max(G.shake,2);G.hitstop=Math.max(G.hitstop,.03)}}
 function petHit(t,dmg,PS,st,o){dmgEnemy(t,dmg,Object.assign({sk:null},o));if(PS>=3){let nb=null,bd=45;for(const e of G.enemies){if(e===t||e.dead)continue;const d=Math.abs(e.x-t.x);if(d<bd){bd=d;nb=e}}if(nb){dmgEnemy(nb,dmg*.5,{sk:null,noCrit:true});G.fx.push({k:'line',x0:t.x,y0:ecy(t),x1:nb.x,y1:ecy(nb),c:stc(PS),glow:true,life:.1,max:.1})}}if(PS>=4&&!t.dead){if(st==='slow')t.slowT=Math.max(t.slowT,2.5);else t.dot={k:st,dps:Math.max(1,dmg*.2),t:3,tick:.5}}}
 function petPos(i){const h=G.h,b=Math.sin(G.time*4+i*2)*2;return[{x:h.x-17,y:GY-24+b},{x:h.x-26,y:GY-6},{x:h.x-4,y:GY-34+b}][i]}
-function pickItem(it){const cur=SAVE.eq[it.slot],R=IRAR[it.rar];
- if(iScore(it)>iScore(cur)){applyEq(cur,-1);SAVE.eq[it.slot]=it;applyEq(it,1);recalc();save();toast(`장착! [${R.n}] ${it.name}`);sfx('lvl');burst(G.h.x,GY-10,[R.c,'#f4f4f4'],20,70,-30)}
- else{const sv=1+it.rar*2;SAVE.souls+=sv;save();addText('+'+sv+' SOUL',G.h.x,GY-30,'bolt');sfx('coin',0)}}
+let itemQ=[],itemPrev=null,itemPrevSt='play',itemCur=null;
+function equipItem(it){const cur=SAVE.eq[it.slot],R=IRAR[it.rar];applyEq(cur,-1);SAVE.eq[it.slot]=it;applyEq(it,1);recalc();save();toast(`장착! [${R.n}] ${it.name}`);sfx('lvl');if(G&&G.h)burst(G.h.x,GY-10,[R.c,'#f4f4f4'],20,70,-30)}
+function passItem(it){const sv=1+it.rar*2;SAVE.souls+=sv;save();if(G&&G.h&&state==='play')addText('+'+sv+' SOUL',G.h.x,GY-30,'bolt');sfx('coin',0);return sv}
+// 빈 슬롯 → 바로 장착 / 더 약하거나 같으면 → 영혼으로 패스 / 더 좋으면 → 비교표로 물어보기
+function pickItem(it){const cur=SAVE.eq[it.slot];if(!cur){equipItem(it);return}if(iScore(it)<=iScore(cur)){passItem(it);return}
+ itemQ.push(it);if(state!=='item'){itemPrevSt=state;itemPrev=[...document.querySelectorAll('.ov.show')].map(o=>o.id)[0]||null;state='item';itemNext()}}
+function itemNext(){while(itemQ.length){const it=itemQ.shift(),cur=SAVE.eq[it.slot];if(!cur){equipItem(it);continue}if(iScore(it)<=iScore(cur)){passItem(it);continue}itemAsk(it,cur);return}
+ state=itemPrevSt;const pv=itemPrev;itemPrev=null;show(pv)}
+const pctS=(k,v)=>(v*100).toFixed(v<.01&&v>0?2:1)+'%';
+function itemAsk(it,cur){itemCur=it;const S=ISLOT[it.slot],card=(x,lab)=>{const R=IRAR[x.rar];return `<div class="cmpl">${lab}</div><img src="${iconURL(S.icon)}" style="--rc:${R.c}"><div class="cmpn" style="color:${R.c}">${x.name}</div><div class="cmpr">${R.n} ${S.n}</div><div class="cmps">장비 점수 <b>${Math.round(iScore(x)*10)}</b></div>`};
+ $('itOld').innerHTML=card(cur,'현재 장착');$('itNew').innerHTML=card(it,'새 장비');
+ const val=(x,k)=>{let v=0;for(const o of[x.main,...x.opts])if(o.k===k)v+=o.v;return v};
+ const keys=[];for(const o of[cur.main,...cur.opts,it.main,...it.opts])if(!keys.includes(o.k))keys.push(o.k);
+ $('itTab').innerHTML='<tr><th>능력치</th><th>현재</th><th>새 장비</th><th>변화</th></tr>'+keys.map(k=>{const a=val(cur,k),b=val(it,k),d=b-a,cl=Math.abs(d)<1e-5?'eq':d>0?'up':'dn';
+  return `<tr><td>${INAME[k]}</td><td>${a?'+'+pctS(k,a):'-'}</td><td>${b?'+'+pctS(k,b):'-'}</td><td class="${cl}">${cl==='eq'?'=':(d>0?'▲ +':'▼ -')+pctS(k,Math.abs(d))}</td></tr>`}).join('')
+  +`<tr class="tot"><td>장비 점수</td><td>${Math.round(iScore(cur)*10)}</td><td>${Math.round(iScore(it)*10)}</td><td class="up">▲ +${Math.round((iScore(it)-iScore(cur))*10)}</td></tr>`;
+ $('itSub').textContent=S.n+' 슬롯에 더 좋은 장비가 나왔어요! 바꿀까요?';$('itNote').textContent='기존 유지를 고르면 새 장비는 영혼 +'+(1+it.rar*2)+'(으)로 바뀌어요'+(itemQ.length?' · 대기 중인 장비 '+itemQ.length+'개':'');
+ sfx('lvl');vib(40);$('ovItem').classList.add('show');for(const o of document.querySelectorAll('.ov.show'))if(o.id!=='ovItem')o.classList.remove('show')}
+$('itEq').onclick=()=>{if(!itemCur)return;const it=itemCur;itemCur=null;equipItem(it);itemNext()};
+$('itKeep').onclick=()=>{if(!itemCur)return;const it=itemCur;itemCur=null;const sv=passItem(it);toast('기존 장비 유지 · 영혼 +'+sv);itemNext()};
 function manualAtk(){const h=G.h;if(h.dead||state!=='play'||G.manT>0)return;G.manT=.13;G.atkPress=.1;const f=front();
  if(f&&f.x-f.hw-h.x<=18)doAttack();else{h.atkAnim=.15;G.fx.push({k:'slash',life:.14,max:.14,crit:false,flip:h.flipS=!h.flipS});sfx('blade',0)}}
 function useSkill(i){const sk=G.skills[i];if(!sk||G.h.dead||state!=='play')return;const D=SKILLS[sk.id];if(!D.cd){toast(D.name+'은(는) 항상 자동으로 돕니다');return}
@@ -1202,7 +1239,7 @@ function drawTitle(){const t=G.time;const bob=Math.round(Math.sin(t*2)*2);
  for(let i=0;i<6;i++){const a=t*1.3+i;ctx.fillStyle=i%2?'#ffcd75':'#f4f4f4';ctx.fillRect(Math.round(W/2+Math.cos(a)*70),Math.round(70+Math.sin(a*1.7)*28),1,1)}}
 
 // ---------- flow / UI
-function show(id){for(const o of document.querySelectorAll('.ov'))o.classList.remove('show');if(id)$(id).classList.add('show')}
+function show(id){if(state==='item'&&id!=='ovItem'){itemPrev=id;return}for(const o of document.querySelectorAll('.ov'))o.classList.remove('show');if(id)$(id).classList.add('show')}
 function goTitle(){saveRun();state='title';newRun();G.scroll=rnd(360);show('ovTitle');const r=loadRun();$('bCont').style.display=r?'':'none';$('bStart').textContent=r?'새로 시작':'▶ 사냥 시작';$('bStart').className=r?'btn':'btn gold';if(r)$('bCont').textContent='▶ 이어하기 (STAGE '+r.stage+')';
  $('titleInfo').innerHTML=[`<b>LV ${SAVE.lv}</b>${SAVE.job&&SAVE.job.b?' '+jobName():''}`,SAVE.rebirth?`환생 <b>★${SAVE.rebirth}</b>`:'',`최고 <b>STAGE ${SAVE.best}</b>`,`영혼 <b style="color:#73eff7">${SAVE.souls}</b>`].filter(Boolean).map(x=>`<span class="chip">${x}</span>`).join('');
  document.querySelectorAll('[data-ic]').forEach(im=>im.src=iconURL(im.dataset.ic));const fp=Object.keys(SAVE.pets)[0];document.querySelector('[data-pet]').src=fp?petImg(fp):petImg('dragon',true)}
