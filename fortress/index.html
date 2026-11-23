@@ -7,8 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  :root { --w: max(280px, min(96vw, calc((100vh - 300px) * 1.6), 1000px)); --f: calc(var(--w) / 480); }
-  @supports (height: 100dvh) { :root { --w: max(280px, min(96vw, calc((100dvh - 300px) * 1.6), 1000px)); } }
+  :root { --w: max(280px, min(96vw, calc((100vh - 330px) * 1.6), 1000px)); --f: calc(var(--w) / 480); }
+  @supports (height: 100dvh) { :root { --w: max(280px, min(96vw, calc((100dvh - 330px) * 1.6), 1000px)); } }
   html, body { overscroll-behavior: none; }
   body {
     margin: 0; min-height: 100vh;
@@ -52,6 +52,7 @@
     font-family: inherit; border: none; border-radius: 12px; cursor: pointer; color: #3d3247;
     background: #f1ecf7; box-shadow: 0 4px 0 rgba(0,0,0,.12); touch-action: manipulation;
   }
+  button:disabled { opacity: .4; }
   button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.12); }
   .grp button { width: clamp(44px, calc(46 * var(--f)), 70px); height: clamp(44px, calc(46 * var(--f)), 70px); font-size: clamp(18px, calc(20 * var(--f)), 30px); }
   #fire {
@@ -86,6 +87,11 @@
   <canvas id="cv"></canvas>
   <div class="ctrl">
     <div class="grp">
+      <button id="mL">◀</button>
+      <div class="lb" style="min-width:60px">이동<small id="mVal">60</small><div class="pbar"><b id="mBar" style="background:linear-gradient(90deg,#7fd67f,#3a8dde)"></b></div></div>
+      <button id="mR">▶</button>
+    </div>
+    <div class="grp">
       <button id="aDn">▼</button>
       <div class="lb">각도<small id="aVal">45°</small></div>
       <button id="aUp">▲</button>
@@ -101,7 +107,7 @@
     <button id="snd">🔊 소리 켜짐</button>
     <button id="newGame">🔄 새 판</button>
   </div>
-  <div class="help">화면을 끌어서 조준할 수도 있어요 · 바람 방향을 잘 보고 쏘세요!<br>키보드: ←→ 각도 · ↑↓ 파워 · 스페이스 발사</div>
+  <div class="help">화면을 끌어서 조준할 수도 있어요 · 바람 방향을 잘 보고 쏘세요!<br>한 턴에 정해진 거리만큼만 이동할 수 있어요 (가파른 비탈은 못 올라가요)<br>키보드: A/D 이동 · ←→ 각도 · ↑↓ 파워 · 스페이스 발사</div>
 
   <div class="overlay show" id="start">
     <div class="card">
@@ -124,7 +130,8 @@
 
 <script>
 'use strict';
-const W = 800, H = 500, G = 0.15;
+const W = 800, H = 500, G = 0.15, MOVE_MAX = 60; // 한 턴 이동 포인트(픽셀)
+let moveDir = 0;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const DPR = Math.min(2, window.devicePixelRatio || 1);
 cv.width = W * DPR; cv.height = H * DPR; ctx.scale(DPR, DPR);
@@ -203,6 +210,7 @@ function newGame() {
 }
 function startTurn() {
   wind = Math.round(rnd(-5, 5));
+  tanks[turn].move = MOVE_MAX; moveDir = 0;
   state = 'aim';
   updateUI();
   setMsg(`${names[turn]} 차례! 🎯`);
@@ -232,10 +240,15 @@ function updateUI() {
     $('aVal').textContent = Math.round(dispAng(t)) + '°';
     $('pVal').textContent = Math.round(t.pow);
     $('pBar').style.width = t.pow + '%';
+    const mv = Math.max(0, Math.round(t.move ?? MOVE_MAX));
+    $('mVal').textContent = mv === 0 ? '다 썼어요' : mv;
+    $('mBar').style.width = (mv / MOVE_MAX * 100) + '%';
   }
   const n = Math.abs(wind);
   $('windArr').textContent = n === 0 ? '잔잔 ·' : (wind < 0 ? '◀'.repeat(n) : '▶'.repeat(n));
   $('fire').disabled = state !== 'aim';
+  const noMove = state !== 'aim' || !t || t.move <= 0;
+  $('mL').disabled = $('mR').disabled = noMove;
 }
 
 function barrelTip(t) {
@@ -244,7 +257,7 @@ function barrelTip(t) {
 }
 function fire() {
   if (state !== 'aim') return;
-  audio();
+  audio(); moveDir = 0;
   const t = tanks[turn], tip = barrelTip(t), v = t.pow * 0.11;
   proj = { x: tip.x, y: tip.y, vx: Math.cos(tip.a) * v, vy: -Math.sin(tip.a) * v, trail: [] };
   flyFrames = 0;
@@ -314,6 +327,20 @@ function explode(x, y) {
   updateUI();
 }
 
+// 좌우 이동: 이동 포인트만큼만, 가파른 비탈·상대 탱크·화면 끝은 못 지나감
+function moveStep() {
+  const t = tanks[turn], o = tanks[1 - turn];
+  if (!moveDir || t.move <= 0 || t.y < gAt(t.x) - .5) return;
+  const step = Math.min(1.2, t.move), nx = t.x + moveDir * step;
+  if (nx < 15 || nx > W - 15) return;
+  if (Math.abs(nx - o.x) < 34) return;
+  if (gAt(t.x) - gAt(nx) > 2.5) { if (!t.blockMsg) { setMsg('너무 가팔라서 못 올라가요! ⛰️'); t.blockMsg = true; } return; }
+  t.blockMsg = false;
+  t.x = nx; t.move -= step;
+  if (gAt(nx) <= t.y) t.y = gAt(nx);
+  t.wob = (t.wob || 0) + 1;
+  updateUI();
+}
 function settleTanks() {
   let moving = false;
   for (const t of tanks) {
@@ -327,6 +354,7 @@ function settleTanks() {
 function update() {
   for (const c of clouds) { c.x += wind * 0.06 + 0.02; if (c.x > W + 80) c.x = -80; if (c.x < -80) c.x = W + 80; }
   if (state === 'fly') stepProj();
+  if (state === 'aim') moveStep();
   const moving = settleTanks();
   for (const p of particles) {
     if (p.ring) { p.r += 5; } else { p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .98; }
@@ -376,7 +404,7 @@ function drawTank(t, k) {
     ctx.restore(); return;
   }
   const col = COLORS[k], a = t.ang * Math.PI / 180;
-  ctx.save(); ctx.translate(t.x, t.y);
+  ctx.save(); ctx.translate(t.x, t.y - (k === turn && moveDir && state === 'aim' ? (t.wob % 6 < 3 ? 1 : 0) : 0));
   ctx.strokeStyle = '#333'; ctx.lineWidth = 5; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(Math.cos(a) * 22, -16 - Math.sin(a) * 22); ctx.stroke();
   ctx.fillStyle = '#3d3d4a'; rrect(-17, -8, 34, 9, 4.5); ctx.fill();
@@ -485,6 +513,14 @@ function hold(btn, fn) {
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
   btn.addEventListener('contextmenu', e => e.preventDefault());
 }
+function holdMove(btn, d) {
+  const stop = () => { if (moveDir === d) moveDir = 0; };
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); audio(); if (state === 'aim') moveDir = d; });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, stop));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+}
+holdMove($('mL'), -1);
+holdMove($('mR'), 1);
 hold($('aUp'), () => raise(1));
 hold($('aDn'), () => raise(-1));
 hold($('pUp'), () => addPow(1));
@@ -510,6 +546,8 @@ cv.addEventListener('pointermove', e => { if (dragging && state === 'aim') aimAt
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') { if (e.key === 'Enter' && $('start').classList.contains('show')) $('startBtn').click(); return; }
   if (state !== 'aim') return;
+  const k = e.key.toLowerCase();
+  if (k === 'a' || k === 'd') { moveDir = k === 'a' ? -1 : 1; e.preventDefault(); return; }
   const big = e.shiftKey ? 5 : 1;
   if (e.key === 'ArrowLeft') raise(turn === 0 ? big : -big);
   else if (e.key === 'ArrowRight') raise(turn === 0 ? -big : big);
@@ -520,6 +558,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
 });
 
+document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if ((k === 'a' && moveDir < 0) || (k === 'd' && moveDir > 0)) moveDir = 0; });
 $('startBtn').addEventListener('click', () => {
   audio();
   names = [$('in0').value.trim() || '빨강 탱크', $('in1').value.trim() || '파랑 탱크'];
