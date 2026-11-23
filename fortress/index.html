@@ -74,6 +74,11 @@
   .card label i { width: 22px; height: 22px; border-radius: 50%; flex: none; }
   .card input { flex: 1; min-width: 0; font-family: inherit; font-size: 20px; padding: 8px 10px; border-radius: 10px; border: 2px solid #e4dcee; color: #3d3247; outline: none; }
   .card input:focus { border-color: #ff9f43; }
+  .picks { display: flex; gap: 6px; margin: 0 0 10px 30px; }
+  .picks button { flex: 1; padding: 6px 2px; font-size: 15px; line-height: 1.2; background: #f4f0f8; border: 3px solid transparent; }
+  .picks button small { display: block; font-size: 11px; color: #8a7f94; }
+  .picks button.sel { border-color: #ff9f43; background: #fff6e8; }
+  .tinfo { font-size: 13px; color: #8a7f94; margin: -6px 0 6px 30px; text-align: left; min-height: 1.2em; }
   .card .go { margin-top: 12px; width: 100%; padding: 12px; font-size: 24px; background: linear-gradient(180deg, #ff8a5c, #ff5e5e); color: #fff; box-shadow: 0 5px 0 #c43f3f; }
 </style>
 </head>
@@ -115,7 +120,9 @@
       <h2>우리 가족 포트리스</h2>
       <p>번갈아 한 발씩! 상대 탱크를 먼저 맞히면 승리</p>
       <label><i style="background:#ff5e5e"></i><input id="in0" maxlength="8" value="빨강 탱크"></label>
+      <div class="picks" id="pick0"></div>
       <label><i style="background:#3a8dde"></i><input id="in1" maxlength="8" value="파랑 탱크"></label>
+      <div class="picks" id="pick1"></div>
       <button class="go" id="startBtn">시작!</button>
     </div>
   </div>
@@ -125,12 +132,20 @@
       <h2 id="oTitle"></h2>
       <p id="oSub"></p>
       <button class="go" id="again">한 판 더!</button>
+      <button id="change" style="margin-top:10px;width:100%;padding:10px;font-size:18px">🔁 탱크 바꾸기</button>
     </div>
   </div>
 
 <script>
 'use strict';
-const W = 800, H = 500, G = 0.15, MOVE_MAX = 60; // 한 턴 이동 포인트(픽셀)
+const W = 800, H = 500, G = 0.15;
+// 탱크 3종: 체력 · 한 턴 이동 거리 · 폭발 크기 · 최대 데미지 · 바람 영향
+const TYPES = [
+  { id: 'bal', name: '튼튼이', emoji: '🛡️', desc: '무난한 균형형', hp: 100, move: 60, R: 34, dmg: 40, windK: 1 },
+  { id: 'atk', name: '펑펑이', emoji: '💣', desc: '큰 폭발! 대신 느려요', hp: 85, move: 35, R: 46, dmg: 52, windK: 1.2 },
+  { id: 'spd', name: '쌩쌩이', emoji: '⚡', desc: '멀리 이동·바람에 강해요', hp: 90, move: 110, R: 26, dmg: 32, windK: 0.5 },
+];
+let picks = [0, 0];
 let moveDir = 0;
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
 const DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -198,10 +213,10 @@ function newGame() {
   const x0 = Math.round(rnd(70, 170)), x1 = Math.round(W - rnd(70, 170));
   flatten(x0, 18); flatten(x1, 18);
   tanks = [
-    { x: x0, y: 0, vy: 0, hp: 100, shown: 100, ang: 45, pow: 60 },
-    { x: x1, y: 0, vy: 0, hp: 100, shown: 100, ang: 135, pow: 60 },
+    { x: x0, y: 0, vy: 0, ang: 45, pow: 60, ty: TYPES[picks[0]] },
+    { x: x1, y: 0, vy: 0, ang: 135, pow: 60, ty: TYPES[picks[1]] },
   ];
-  for (const t of tanks) t.y = gAt(t.x);
+  for (const t of tanks) { t.y = gAt(t.x); t.hp = t.shown = t.maxHp = t.ty.hp; }
   clouds = Array.from({ length: 5 }, () => ({ x: rnd(0, W), y: rnd(30, 140), s: rnd(.7, 1.4) }));
   particles = []; texts = []; proj = null;
   turn = Math.random() < .5 ? 0 : 1;
@@ -210,7 +225,7 @@ function newGame() {
 }
 function startTurn() {
   wind = Math.round(rnd(-5, 5));
-  tanks[turn].move = MOVE_MAX; moveDir = 0;
+  tanks[turn].move = tanks[turn].ty.move; moveDir = 0;
   state = 'aim';
   updateUI();
   setMsg(`${names[turn]} 차례! 🎯`);
@@ -230,19 +245,19 @@ function updateUI() {
   for (let i = 0; i < 2; i++) {
     $('n' + i).textContent = names[i];
     $('hud' + i).classList.toggle('active', i === turn && state !== 'over');
-    const hp = Math.max(0, tanks[i] ? tanks[i].hp : 100);
-    const b = $('hp' + i); b.style.width = hp + '%';
-    b.style.background = hp > 60 ? '#4cd16b' : hp > 30 ? '#ffb627' : '#ff5e5e';
-    $('hpn' + i).textContent = `체력 ${hp}`;
+    const tk = tanks[i], hp = Math.max(0, tk ? tk.hp : 100), mx = tk ? tk.maxHp : 100, pc = hp / mx * 100;
+    const b = $('hp' + i); b.style.width = pc + '%';
+    b.style.background = pc > 60 ? '#4cd16b' : pc > 30 ? '#ffb627' : '#ff5e5e';
+    $('hpn' + i).textContent = `${tk ? tk.ty.emoji + ' ' + tk.ty.name + ' · ' : ''}체력 ${hp}`;
   }
   const t = tanks[turn];
   if (t) {
     $('aVal').textContent = Math.round(dispAng(t)) + '°';
     $('pVal').textContent = Math.round(t.pow);
     $('pBar').style.width = t.pow + '%';
-    const mv = Math.max(0, Math.round(t.move ?? MOVE_MAX));
+    const mv = Math.max(0, Math.round(t.move ?? t.ty.move));
     $('mVal').textContent = mv === 0 ? '다 썼어요' : mv;
-    $('mBar').style.width = (mv / MOVE_MAX * 100) + '%';
+    $('mBar').style.width = (mv / t.ty.move * 100) + '%';
   }
   const n = Math.abs(wind);
   $('windArr').textContent = n === 0 ? '잔잔 ·' : (wind < 0 ? '◀'.repeat(n) : '▶'.repeat(n));
@@ -253,7 +268,8 @@ function updateUI() {
 
 function barrelTip(t) {
   const a = t.ang * Math.PI / 180;
-  return { x: t.x + Math.cos(a) * 22, y: t.y - 16 - Math.sin(a) * 22, a };
+  const L = t.ty.id === 'spd' ? 26 : t.ty.id === 'atk' ? 22 : 22;
+  return { x: t.x + Math.cos(a) * L, y: t.y - 16 - Math.sin(a) * L, a };
 }
 function fire() {
   if (state !== 'aim') return;
@@ -269,7 +285,7 @@ function fire() {
 }
 
 function stepProj() {
-  proj.vx += wind * 0.0035;
+  proj.vx += wind * 0.0035 * tanks[turn].ty.windK;
   proj.vy += G;
   const sp = Math.hypot(proj.vx, proj.vy), n = Math.max(1, Math.ceil(sp / 2));
   for (let i = 0; i < n; i++) {
@@ -291,7 +307,7 @@ function miss() {
   setMsg('아쉽다~ 화면 밖으로 나갔어요 😅');
 }
 function explode(x, y) {
-  const R = 34;
+  const sh = tanks[turn].ty, R = sh.R;
   proj = null; state = 'boom'; timer = 0;
   for (let xi = Math.floor(x - R); xi <= Math.ceil(x + R); xi++) {
     if (xi < 0 || xi >= W) continue;
@@ -303,7 +319,7 @@ function explode(x, y) {
   tanks.forEach((t, k) => {
     const d = Math.hypot(t.x - x, (t.y - 9) - y);
     if (d < R + 12) {
-      const dmg = Math.max(5, Math.round(40 * (1 - d / (R + 12))));
+      const dmg = Math.max(5, Math.round(sh.dmg * (1 - d / (R + 12))));
       t.hp = Math.max(0, t.hp - dmg); hitAny = true;
       texts.push({ x: t.x, y: t.y - 40, s: '-' + dmg, c: COLORS[k].main, life: 70 });
       if (k === turn) msg = msg || '앗! 내가 맞았어요 😵';
@@ -315,8 +331,8 @@ function explode(x, y) {
   shake = hitAny ? 14 : 8;
   sndBoom(hitAny);
   if (hitAny && navigator.vibrate) try { navigator.vibrate(120); } catch (e) {}
-  for (let i = 0; i < 26; i++) {
-    const a = rnd(0, Math.PI * 2), s = rnd(1, 5);
+  for (let i = 0; i < 26 + R / 2; i++) {
+    const a = rnd(0, Math.PI * 2), s = rnd(1, 5) * R / 34;
     particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, life: rnd(25, 45), max: 45, c: ['#ffd56b', '#ff9f43', '#ff5e5e', '#fff3b0'][i % 4], r: rnd(3, 7), g: .05 });
   }
   for (let i = 0; i < 18; i++) {
@@ -397,6 +413,36 @@ function drawCloud(c) {
   ctx.beginPath(); ctx.arc(0, 0, 20, 0, 7); ctx.arc(22, -8, 24, 0, 7); ctx.arc(46, 0, 18, 0, 7); ctx.arc(22, 6, 20, 0, 7); ctx.fill();
   ctx.restore();
 }
+// 탱크 모양 (종류별)
+function drawBody(id, col, a) {
+  ctx.lineCap = 'round';
+  const barrel = (len, w) => { ctx.strokeStyle = '#333'; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(Math.cos(a) * len, -16 - Math.sin(a) * len); ctx.stroke(); };
+  const wheels = (x0, x1, r) => { ctx.fillStyle = '#9a9aa8'; for (let i = x0; i <= x1; i += 8) { ctx.beginPath(); ctx.arc(i, -3.5, r, 0, 7); ctx.fill(); } };
+  if (id === 'atk') { // 펑펑이: 넓고 묵직, 굵은 포신
+    barrel(20, 9); ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(Math.cos(a) * 20, -16 - Math.sin(a) * 20, 5.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3d3d4a'; rrect(-20, -9, 40, 10, 5); ctx.fill(); wheels(-15, 15, 2.8);
+    ctx.fillStyle = col.main; rrect(-17, -17, 34, 10, 3); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -16, 10, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = col.dark; for (let i = -12; i <= 12; i += 6) ctx.fillRect(i - 1, -15, 2, 6);
+    ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.beginPath(); ctx.arc(-4, -20, 3, 0, 7); ctx.fill();
+  } else if (id === 'spd') { // 쌩쌩이: 작고 날렵, 가는 긴 포신 + 꼬리날개
+    barrel(26, 3.5);
+    ctx.fillStyle = col.dark; ctx.beginPath(); ctx.moveTo(-14, -12); ctx.lineTo(-20, -20); ctx.lineTo(-16, -20); ctx.lineTo(-8, -12); ctx.fill();
+    ctx.fillStyle = '#3d3d4a'; rrect(-14, -7, 28, 8, 4); ctx.fill(); wheels(-9, 9, 2.4);
+    ctx.fillStyle = col.main; ctx.beginPath(); ctx.moveTo(-13, -7); ctx.lineTo(-11, -14); ctx.lineTo(9, -14); ctx.lineTo(15, -7); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, -14, 7, 5, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.moveTo(-3, -12); ctx.lineTo(2, -12); ctx.lineTo(-1, -9); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(-2, -16, 2, 0, 7); ctx.fill();
+  } else { // 튼튼이: 기본형
+    barrel(22, 5);
+    ctx.fillStyle = '#3d3d4a'; rrect(-17, -8, 34, 9, 4.5); ctx.fill(); wheels(-12, 12, 2.5);
+    ctx.fillStyle = col.main; rrect(-14, -15, 28, 9, 4); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, -15, 9, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = col.dark; ctx.beginPath(); ctx.arc(0, -15, 4, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(-4, -19, 2.5, 0, 7); ctx.fill();
+    ctx.fillStyle = col.dark; ctx.fillRect(-14, -8.5, 28, 2);
+  }
+}
 function drawTank(t, k) {
   if (t.hp <= 0 && state === 'over') { // 쓰러진 탱크
     ctx.save(); ctx.translate(t.x, t.y); ctx.fillStyle = '#555';
@@ -405,22 +451,16 @@ function drawTank(t, k) {
   }
   const col = COLORS[k], a = t.ang * Math.PI / 180;
   ctx.save(); ctx.translate(t.x, t.y - (k === turn && moveDir && state === 'aim' ? (t.wob % 6 < 3 ? 1 : 0) : 0));
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(Math.cos(a) * 22, -16 - Math.sin(a) * 22); ctx.stroke();
-  ctx.fillStyle = '#3d3d4a'; rrect(-17, -8, 34, 9, 4.5); ctx.fill();
-  ctx.fillStyle = '#9a9aa8'; for (let i = -12; i <= 12; i += 8) { ctx.beginPath(); ctx.arc(i, -3.5, 2.5, 0, 7); ctx.fill(); }
-  ctx.fillStyle = col.main; rrect(-14, -15, 28, 9, 4); ctx.fill();
-  ctx.beginPath(); ctx.arc(0, -15, 9, Math.PI, 0); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.arc(-3, -18, 3, 0, 7); ctx.fill();
-  ctx.fillStyle = col.dark; ctx.fillRect(-14, -8.5, 28, 2);
+  drawBody(t.ty.id, col, a);
   ctx.restore();
   // 이름 + 체력바
   const bw = 44 * US, by = t.y - 30 - 14 * US;
   ctx.fillStyle = 'rgba(0,0,0,.25)'; rrect(t.x - bw / 2 - 1, by - 1, bw + 2, 6 * US + 2, 4); ctx.fill();
   ctx.fillStyle = '#fff'; rrect(t.x - bw / 2, by, bw, 6 * US, 3); ctx.fill();
-  ctx.fillStyle = '#ffb3b3'; rrect(t.x - bw / 2, by, bw * Math.max(0, t.shown) / 100, 6 * US, 3); ctx.fill();
-  ctx.fillStyle = t.hp > 60 ? '#4cd16b' : t.hp > 30 ? '#ffb627' : '#ff5e5e';
-  rrect(t.x - bw / 2, by, bw * Math.max(0, t.hp) / 100, 6 * US, 3); ctx.fill();
+  ctx.fillStyle = '#ffb3b3'; rrect(t.x - bw / 2, by, bw * Math.max(0, t.shown) / t.maxHp, 6 * US, 3); ctx.fill();
+  const pc = t.hp / t.maxHp * 100;
+  ctx.fillStyle = pc > 60 ? '#4cd16b' : pc > 30 ? '#ffb627' : '#ff5e5e';
+  rrect(t.x - bw / 2, by, bw * Math.max(0, t.hp) / t.maxHp, 6 * US, 3); ctx.fill();
   ctx.font = `${14 * US}px Jua, sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * US; ctx.strokeStyle = 'rgba(255,255,255,.85)';
   ctx.strokeText(names[k], t.x, by - 5); ctx.fillStyle = col.dark; ctx.fillText(names[k], t.x, by - 5);
   // 차례 표시
@@ -559,14 +599,28 @@ document.addEventListener('keydown', e => {
 });
 
 document.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if ((k === 'a' && moveDir < 0) || (k === 'd' && moveDir > 0)) moveDir = 0; });
+function renderPicks() {
+  for (let i = 0; i < 2; i++) {
+    const box = $('pick' + i); box.innerHTML = '';
+    TYPES.forEach((ty, j) => {
+      const b = document.createElement('button');
+      b.className = picks[i] === j ? 'sel' : '';
+      b.innerHTML = `${ty.emoji} ${ty.name}<small>${ty.desc}</small>`;
+      b.onclick = () => { picks[i] = j; renderPicks(); };
+      box.appendChild(b);
+    });
+  }
+}
 $('startBtn').addEventListener('click', () => {
   audio();
+  try { localStorage.setItem('fortressPicks', JSON.stringify(picks)); } catch (e) {}
   names = [$('in0').value.trim() || '빨강 탱크', $('in1').value.trim() || '파랑 탱크'];
   try { localStorage.setItem('fortressNames', JSON.stringify(names)); } catch (e) {}
   $('start').classList.remove('show');
   newGame();
 });
 $('again').addEventListener('click', newGame);
+$('change').addEventListener('click', () => { $('over').classList.remove('show'); state = 'start'; renderPicks(); $('start').classList.add('show'); });
 $('newGame').addEventListener('click', () => { if (state === 'start') return; newGame(); });
 $('snd').addEventListener('click', () => {
   soundOn = !soundOn; $('snd').textContent = soundOn ? '🔊 소리 켜짐' : '🔇 소리 꺼짐';
@@ -575,12 +629,15 @@ $('snd').addEventListener('click', () => {
 try {
   const n = JSON.parse(localStorage.getItem('fortressNames') || 'null');
   if (Array.isArray(n) && n.length === 2) { $('in0').value = n[0]; $('in1').value = n[1]; }
+  const pk = JSON.parse(localStorage.getItem('fortressPicks') || 'null');
+  if (Array.isArray(pk) && pk.length === 2) picks = pk.map(v => clamp(v | 0, 0, TYPES.length - 1));
   if (localStorage.getItem('fortressSound') === '0') { soundOn = false; $('snd').textContent = '🔇 소리 꺼짐'; }
 } catch (e) {}
 
 // 시작 화면 뒤 배경
 genTerrain();
-tanks = [{ x: 120, y: 0, hp: 100, shown: 100, ang: 45, pow: 60, vy: 0 }, { x: 680, y: 0, hp: 100, shown: 100, ang: 135, pow: 60, vy: 0 }];
+renderPicks();
+tanks = [{ x: 120, y: 0, hp: 100, maxHp: 100, shown: 100, ang: 45, pow: 60, vy: 0, ty: TYPES[0] }, { x: 680, y: 0, hp: 100, maxHp: 100, shown: 100, ang: 135, pow: 60, vy: 0, ty: TYPES[0] }];
 flatten(120, 18); flatten(680, 18); tanks.forEach(t => t.y = gAt(t.x));
 clouds = Array.from({ length: 5 }, () => ({ x: rnd(0, W), y: rnd(30, 140), s: rnd(.7, 1.4) }));
 updateUI();
