@@ -15,7 +15,7 @@
 button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 #hud{position:absolute;inset:max(12px,env(safe-area-inset-top)) 12px auto;display:flex;align-items:start;justify-content:space-between;gap:8px;pointer-events:none}
-.chip,#pause{background:#141e32ec;border:1px solid #ffffff38;border-radius:12px;padding:9px 12px;box-shadow:0 3px #070e1b80}
+.chip,#pause{background:#13101eea;border:1px solid #d8ac655e;border-radius:12px;padding:9px 12px;box-shadow:0 3px #070e1b80}
 #pause{pointer-events:auto;min-height:44px}
 #progress{height:5px;border-radius:5px;background:#3c4155;margin-top:6px;overflow:hidden}
 #progress b{display:block;height:100%;background:#b5eb79}
@@ -23,12 +23,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 #toast{position:absolute;top:25%;left:50%;transform:translateX(-50%);padding:8px 14px;background:#111b31eb;border-radius:10px;text-align:center;pointer-events:none}
 #overlay{position:absolute;inset:0;display:grid;place-items:center;background:#090f1caa;padding:16px;overflow:auto}
 #overlay[hidden],#hud[hidden],#toast[hidden],#hint[hidden]{display:none}
-#panel{width:min(100%,420px);max-height:100%;overflow:auto;border:2px solid #58707a;border-radius:22px;padding:clamp(16px,5vw,28px);background:#17243a;box-shadow:0 6px #090f1c;text-align:center}
+#panel{width:min(100%,420px);max-height:100%;overflow:auto;border:1px solid #b99058;border-radius:20px;padding:clamp(16px,5vw,28px);background:linear-gradient(155deg,#342637,#171522 65%);box-shadow:0 20px 60px #090b12bf,inset 0 1px #edc78955;text-align:center}
 h1,h2,p{margin:0 0 12px} h1{font-size:clamp(26px,7vw,39px);letter-spacing:-.06em}
 p{line-height:1.55;color:#d1d9e3}
 .actions{display:grid;gap:9px;margin-top:18px}
-.actions button{background:#273a54;border:1px solid #63758c;border-radius:11px;min-height:47px;padding:9px;font-weight:700}
-.actions button.primary{background:#bee97a;color:#17243a;border-color:#d0f2a5}
+.actions button{background:#2e273b;border:1px solid #c5a06a61;border-radius:11px;min-height:47px;padding:9px;font-weight:700}
+.actions button.primary{background:linear-gradient(#f9df9b,#d0a050);color:#2a1c29;border-color:#ffe4a9}
 #emblem{display:flex;justify-content:center;margin:0 0 16px}
 #emblem i{display:block;background:#8bc661;width:28px;height:24px;border:3px solid #233d3e;box-shadow:inset 0 5px #c9ed88;border-radius:7px;margin-right:-5px}
 #emblem i:last-child{background:#c9ed88;width:34px;position:relative;box-shadow:inset 0 -6px #8bc661}
@@ -55,19 +55,53 @@ const touches = new Map();
 const TAU = Math.PI * 2;
 const W = 1080;
 const H = 1440;
-const palette = ['#b5eb79', '#7de7f5', '#ff947c', '#ba9af8', '#ffc978'];
+const PALETTES = ['#93ce4a', '#44bcea', '#e96047', '#a36cea', '#e6af46'];
+const MAX_LEVEL = 9999;
+const SKILL_LEVEL = 50;
+const XP_PER_LEVEL = 8;
+const MAX_XP = (MAX_LEVEL - 1) * XP_PER_LEVEL;
+const FOREST_XP = 40;
 const relics = ['달빛 씨앗', '용암 유리', '불씨 왕관'];
-let save = { best: 0, relics: [], skin: false };
+const save = { best: 0, relics: [], skin: false, profiles: [{ xp: 0, skill: '' }, { xp: 0, skill: '' }], run: null };
 try { Object.assign(save, JSON.parse(localStorage.getItem('firefly-snake-v1'))); } catch {}
 let width, height, zoom, offsetX, offsetY;
 let players = [], rivals = [], food = [], sparks = [], rings = [];
 let state = 'menu', mode = 1, stage = 0, elapsed = 0, stageTime = 0;
+let cycle = 1;
 let rivalTimer = 0, defeats = 0, caveDefeats = 0, noticeUntil = 0, lastHud = -1;
 const random = (min, max) => min + Math.random() * (max - min);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const living = snakes => snakes.filter(snake => snake.alive);
 
+function levelOf(xp) {
+  return 1 + Math.floor(xp / XP_PER_LEVEL);
+}
+function formatLevel(level) {
+  return level.toLocaleString('ko-KR');
+}
+function saveRun() {
+  // Clone the snapshot so further gameplay cannot mutate the saved run.
+  save.run = JSON.parse(JSON.stringify({
+    mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats,
+    players, rivals, food, rings, sparks: sparks.map(({owner, ...spark}) => ({...spark, owner: owner.player}))
+  }));
+  persist();
+}
+function continueRun() {
+  const run = JSON.parse(JSON.stringify(save.run));
+  ({ mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats, players, rivals, food, rings, sparks } = run);
+  for (const spark of sparks) spark.owner = players[spark.owner];
+  for (const player of players) syncProfile(player);
+  lastHud = -1;
+  toast.hidden = true;
+  resume();
+}
+function syncProfile(player) {
+  const profile = save.profiles[player.player];
+  player.level = levelOf(profile.xp);
+  player.skill = player.level >= SKILL_LEVEL ? profile.skill : '';
+}
 function persist() {
   try { localStorage.setItem('firefly-snake-v1', JSON.stringify(save)); } catch {}
 }
@@ -78,7 +112,7 @@ function resize() {
   canvas.width = width * ratio;
   canvas.height = height * ratio;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -101,8 +135,9 @@ function dialog(title, content, actions, emblem = false) {
 function menu() {
   state = 'menu';
   hud.hidden = hint.hidden = toast.hidden = true;
-  dialog('반딧불 뱀 탐험대', '빛나는 먹이를 모으고, 상대 뱀의 길을 막아 몸집을 키워요.<br>레벨 6부터 첫 자동 기술을 배워요.', [
-    ['혼자 탐험', () => start(1)], ['둘이 같이 탐험', () => start(2)],
+  dialog('반딧불 뱀 탐험대', '빛나는 먹이를 모으고 상대 뱀의 길을 막아 몸집을 키워요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
+    ...(save.run ? [['저장한 탐험 이어하기', continueRun]] : []),
+    ['새로운 1인 탐험', () => start(1)], ['새로운 2인 탐험', () => start(2)],
     ['보물 수집함 · ' + save.relics.length + '/' + relics.length, collection]
   ], true);
 }
@@ -131,7 +166,7 @@ function spawnRival() {
   const side = Math.floor(random(0, 4));
   const x = side < 2 ? (side ? W - 92 : 92) : random(110, W - 110);
   const y = side < 2 ? random(110, H - 110) : (side === 2 ? 92 : H - 92);
-  const rival = snake(x, y, Math.atan2(H / 2 - y, W / 2 - x), palette[Math.floor(random(2, 5))]);
+  const rival = snake(x, y, Math.atan2(H / 2 - y, W / 2 - x), PALETTES[Math.floor(random(2, 5))]);
   rival.turn = 0;
   rival.cautious = Math.random() < .55;
   rivals.push(rival);
@@ -142,10 +177,12 @@ function seedFood(n) {
 function start(count) {
   mode = count;
   stage = 0;
+  cycle = 1;
   elapsed = stageTime = defeats = caveDefeats = rivalTimer = 0;
   lastHud = -1;
-  players = [snake(W / 2 - (count === 2 ? 52 : 0), H / 2, -Math.PI / 2, save.skin ? '#ff9a55' : palette[0], 0)];
-  if (count === 2) players.push(snake(W / 2 + 52, H / 2, Math.PI / 2, palette[1], 1));
+  players = [snake(W / 2 - (count === 2 ? 52 : 0), H / 2, -Math.PI / 2, save.skin ? '#ff9a55' : PALETTES[0], 0)];
+  if (count === 2) players.push(snake(W / 2 + 52, H / 2, Math.PI / 2, PALETTES[1], 1));
+  players.forEach(syncProfile);
   rivals = [];
   food = [];
   sparks = [];
@@ -166,7 +203,9 @@ function pause() {
   if (state !== 'play') return;
   state = 'pause';
   dialog('일시정지', mode === 2 ? '키보드에서는 1P WASD · 2P 방향키를 사용해요.' : '키보드에서는 방향키 또는 WASD로 움직여요.', [
-    ['계속하기', resume], ['처음으로', menu]
+    ['계속하기', resume],
+    ['현재 탐험 저장하고 처음으로', () => { saveRun(); menu(); }],
+    ['처음으로', menu]
   ]);
 }
 document.querySelector('#pause').onclick = pause;
@@ -181,11 +220,17 @@ function discover(name) {
   persist();
   notify('보물 발견 · ' + name);
 }
+function setSkill(player, skill) {
+  save.profiles[player.player].skill = skill;
+  syncProfile(player);
+  persist();
+  resume();
+}
 function chooseSkill(snake) {
   state = 'skill';
-  dialog(mode === 2 ? (snake.player + 1) + 'P · 첫 자동 기술' : '첫 자동 기술', '레벨 6에 도달했어요. 이번 탐험에 쓸 기술을 골라요.', [
-    ['반딧불 고리 · 가까운 상대를 밀어내요', () => { snake.skill = 'ring'; resume(); }],
-    ['별빛 화살 · 먼 상대를 겨눠요', () => { snake.skill = 'bolt'; resume(); }]
+  dialog(mode === 2 ? (snake.player + 1) + 'P · 첫 자동 기술' : '첫 자동 기술', '레벨 ' + SKILL_LEVEL + '에 도달했어요. 앞으로 함께할 기술을 골라요.', [
+    ['반딧불 고리 · 가까운 상대를 밀어내요', () => setSkill(snake, 'ring')],
+    ['별빛 화살 · 먼 상대를 겨눠요', () => setSkill(snake, 'bolt')]
   ]);
 }
 function point(event) {
@@ -263,7 +308,7 @@ function advance(s, target, dt) {
     const delta = Math.atan2(Math.sin(target - s.heading), Math.cos(target - s.heading));
     s.heading += clamp(delta, -4.6 * dt, 4.6 * dt);
   }
-  const speed = s.player === undefined ? 90 + stage * 14 : 133;
+  const speed = s.player === undefined ? 90 + stage * 14 + Math.min(25, (cycle - 1) * 2) : 133;
   const x = s.x + Math.cos(s.heading) * speed * dt;
   const y = s.y + Math.sin(s.heading) * speed * dt;
   if (x < 18 || x > W - 18) s.heading = Math.PI - s.heading;
@@ -283,15 +328,18 @@ function advance(s, target, dt) {
 }
 function grow(s, value) {
   s.xp += value;
-  if (s.player !== undefined) {
-    s.level = 1 + Math.floor(s.xp / 8);
-  }
   const length = Math.min(s.player === undefined ? 24 : 68, 7 + Math.floor(s.xp / 3));
   while (s.body.length < length) s.body.push({ ...s.body.at(-1) });
   s.length = length;
-  if (s.player !== undefined && length > save.best) {
-    save.best = length;
-    persist();
+  if (s.player !== undefined) {
+    const profile = save.profiles[s.player];
+    const nextXP = Math.min(MAX_XP, profile.xp + value);
+    if (nextXP !== profile.xp || length > save.best) {
+      profile.xp = nextXP;
+      save.best = Math.max(save.best, length);
+      syncProfile(s);
+      persist();
+    }
   }
 }
 function scatter(s, owner) {
@@ -351,15 +399,17 @@ function useSkill(player, dt) {
     sparks.push({x: player.x, y: player.y, vx: Math.cos(angle) * 360, vy: Math.sin(angle) * 360, life: .85, owner: player});
   }
 }
-function end(won) {
+function end() {
   state = 'end';
-  dialog(won ? '탐험 완료!' : '이번 탐험이 끝났어요',
+  dialog('이번 탐험이 끝났어요',
     '최고 길이 ' + Math.max(...players.map(s => s.length)) + '마디 · 상대 뱀 ' + defeats + '마리<br>모은 보물 ' + save.relics.length + '/' + relics.length, [
       ['다시 탐험', () => start(mode)], ['보물 수집함', collection], ['처음으로', menu]
     ]);
 }
-function enterCave() {
-  stage = 1;
+function nextRegion() {
+  stage = 1 - stage;
+  if (!stage) cycle++;
+  caveDefeats = 0;
   stageTime = 0;
   food = [];
   rivals = [];
@@ -374,10 +424,10 @@ function enterCave() {
     while (s.body.length < s.length) s.body.push({...s.body.at(-1)});
     s.shield = 4;
   }
-  seedFood(120);
-  for (let i = 0; i < 7; i++) spawnRival();
-  discover('용암 유리');
-  notify('용암굴 도착 · 60초 동안 살아남아요!', 5);
+  seedFood(stage ? 120 : 110);
+  for (let i = 0; i < (stage ? 7 : 6); i++) spawnRival();
+  if (stage) discover('용암 유리');
+  notify(stage ? '용암굴 도착 · 60초 동안 살아남아요!' : '반딧불 숲으로 돌아왔어요 · ' + cycle + '번째 순환', 5);
 }
 function update(dt) {
   elapsed += dt;
@@ -407,10 +457,11 @@ function update(dt) {
   sparks = sparks.filter(s => s.life > 0);
   rings = rings.filter(ring => (ring.life -= dt) > 0);
   rivals = living(rivals);
-  if (!living(players).length) { end(false); return; }
-  if (stage === 1 && stageTime >= 60) { end(true); return; }
-  if (stage === 0 && elapsed >= 65 && living(players).some(s => s.level >= 6)) enterCave();
-  const awaiting = living(players).find(s => s.level >= 6 && !s.skill);
+  if (!living(players).length) { end(); return; }
+  if ((stage && stageTime >= 60) || (!stage && stageTime >= 65 && living(players).some(s => s.xp >= FOREST_XP))) {
+    nextRegion();
+  }
+  const awaiting = living(players).find(s => s.level >= SKILL_LEVEL && !s.skill);
   if (awaiting) chooseSkill(awaiting);
   rivalTimer += dt;
   if (rivalTimer > 1.3) {
@@ -422,73 +473,171 @@ function update(dt) {
   if (tick !== lastHud) {
     lastHud = tick;
     const status = players.map((s, i) => (mode === 2 ? (i + 1) + 'P ' : '') +
-      (s.alive ? 'Lv.' + s.level + ' · ' + s.length + '마디' : '탈락')).join(' / ');
+      (s.alive ? 'Lv.' + formatLevel(s.level) + ' · ' + s.length + '마디' : '탈락')).join(' / ');
+    const xp = save.profiles[0].xp;
+    const progress = xp === MAX_XP ? 100 : (xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100;
     stats.innerHTML = (stage ? '용암굴 · ' + Math.max(0, Math.ceil(60 - stageTime)) + '초' : '반딧불 숲') +
-      '<br>' + status + '<div id="progress" aria-hidden="true"><b style="width:' + (players[0].xp % 8 * 12.5) + '%"></b></div>';
+      ' · ' + cycle + '순환<br>' + status + '<div id="progress" aria-hidden="true"><b style="width:' + progress + '%"></b></div>';
   }
 }
 
-function block(x, y, w, h, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(Math.round(x), Math.round(y), w, h);
+const art = new Map();
+function sprite(key, size, paint) {
+  if (!art.has(key)) {
+    const surface = document.createElement('canvas');
+    surface.width = surface.height = size;
+    paint(surface.getContext('2d'));
+    art.set(key, surface);
+  }
+  return art.get(key);
 }
-function pixelGem(x, y, radius, color) {
-  block(x - radius, y - radius + 2, radius * 2, radius * 2 - 4, color);
-  block(x - radius + 2, y - radius, radius * 2 - 4, radius * 2, color);
-  block(x - radius + 2, y - radius + 2, 3, 3, '#fff9df');
+function shape(g, points, fill) {
+  g.beginPath();
+  g.moveTo(...points[0]);
+  for (const point of points.slice(1)) g.lineTo(...point);
+  g.closePath();
+  g.fillStyle = fill;
+  g.fill();
+}
+function glow(g, x, y, radius, color) {
+  const light = g.createRadialGradient(x, y, 0, x, y, radius);
+  light.addColorStop(0, color);
+  light.addColorStop(1, '#00000000');
+  g.fillStyle = light;
+  g.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+}
+function armor(color, head) {
+  return sprite(color + head, 80, g => {
+    g.translate(40, 40);
+    g.scale(2, 2);
+    const outline = head
+      ? [[-13, -8], [-3, -14], [7, -14], [15, -7], [17, 0], [15, 7], [7, 14], [-3, 14], [-13, 8], [-15, 0]]
+      : [[-9, -6], [-4, -11], [4, -11], [10, -6], [11, 0], [10, 6], [4, 11], [-4, 11], [-9, 6], [-11, 0]];
+    const metal = g.createLinearGradient(-6, -13, 4, 14);
+    metal.addColorStop(0, '#f5f1d9');
+    metal.addColorStop(.26, color);
+    metal.addColorStop(.58, color);
+    metal.addColorStop(1, '#231426');
+    g.save();
+    g.translate(-1, 4);
+    shape(g, outline, '#040813ab');
+    g.restore();
+    shape(g, outline, '#10121d');
+    g.save();
+    g.scale(.91, .9);
+    shape(g, outline, metal);
+    g.restore();
+    if (head) {
+      const crest = g.createLinearGradient(-10, 0, 9, 0);
+      crest.addColorStop(0, '#f7e3af');
+      crest.addColorStop(.5, color);
+      crest.addColorStop(1, '#462638');
+      shape(g, [[-12, 0], [-2, -6], [9, 0], [-2, 6]], crest);
+      for (const side of [-1, 1]) {
+        shape(g, [[3, side * 6], [11, side * 4], [9, side * 9], [5, side * 10]], '#21172a');
+        shape(g, [[5, side * 7], [9, side * 5], [8, side * 8], [6, side * 9]], '#fff3b5');
+        shape(g, [[-8, side * 9], [-14, side * 15], [-4, side * 11]], color);
+      }
+    } else {
+      shape(g, [[-8, -4], [-3, -7], [3, -7], [7, -4], [1, -5]], '#fff7d778');
+      shape(g, [[-5, 6], [2, 4], [8, 2], [5, 7], [-2, 8]], '#1b172840');
+    }
+  });
 }
 function drawSnake(s) {
+  const body = armor(s.color, false);
   for (let i = s.body.length - 1; i >= 0; i--) {
     const p = s.body[i];
-    const r = i > s.body.length - 4 ? 7 : 9;
-    block(p.x - r, p.y - r + 4, r * 2, r * 2, '#10162a');
-    pixelGem(p.x, p.y, r, s.color);
-    block(p.x - r + 2, p.y + r - 4, r * 2 - 4, 3, '#17233a50');
+    const target = s.body[i - 1] ?? s;
+    const size = 40 * Math.max(.55, 1 - Math.max(0, i - s.body.length + 5) * .1);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(Math.atan2(target.y - p.y, target.x - p.x));
+    ctx.drawImage(body, -size / 2, -size / 2, size, size);
+    ctx.restore();
   }
   ctx.save();
   ctx.translate(s.x, s.y);
   ctx.rotate(s.heading);
-  pixelGem(0, 0, 13, s.color);
-  block(4, -8, 5, 5, '#171e31');
-  block(4, 3, 5, 5, '#171e31');
-  block(5, -8, 2, 2, '#fff');
-  block(5, 3, 2, 2, '#fff');
+  ctx.drawImage(armor(s.color, true), -24, -24, 48, 48);
   ctx.restore();
-  if (s.shield > 0 && s.player !== undefined) {
-    ctx.strokeStyle = '#eefad3a0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 19, 0, TAU);
-    ctx.stroke();
-  }
-  if (s.player !== undefined && mode === 2) {
-    ctx.fillStyle = '#fff9df';
-    ctx.font = 'bold 15px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText((s.player + 1) + 'P', s.x, s.y - 22);
-  }
-}
-function drawMap() {
-  const left = Math.max(0, Math.floor(-offsetX / zoom / 40) * 40);
-  const top = Math.max(0, Math.floor(-offsetY / zoom / 40) * 40);
-  const right = Math.min(W, (width - offsetX) / zoom + 40);
-  const bottom = Math.min(H, (height - offsetY) / zoom + 40);
-  for (let y = top; y < bottom; y += 40) {
-    for (let x = left; x < right; x += 40) {
-      const pattern = ((x * 17 + y * 31) ^ (x * y)) >>> 3;
-      const colors = stage ? ['#3b2739', '#402a3d', '#432c40'] : ['#193b38', '#1d423e', '#204541'];
-      block(x, y, 41, 41, colors[pattern % colors.length]);
-      if (pattern % 7 === 0) {
-        const px = x + 10 + pattern % 16;
-        const py = y + 11;
-        block(px, py, 3, 7, stage ? '#82505a' : '#4b7760');
-        block(px - 3, py + 3, 9, 3, stage ? '#82505a' : '#4b7760');
-      }
+  if (s.player !== undefined) {
+    if (s.shield > 0) {
+      ctx.strokeStyle = '#fff6b782';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 22, 0, TAU);
+      ctx.stroke();
+    }
+    if (mode === 2) {
+      ctx.fillStyle = '#fff9df';
+      ctx.font = 'bold 16px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText((s.player + 1) + 'P', s.x, s.y - 27);
     }
   }
-  ctx.strokeStyle = stage ? '#f07a59' : '#73a982';
-  ctx.lineWidth = 8;
-  ctx.strokeRect(0, 0, W, H);
+}
+function terrain(variant) {
+  return sprite('ground-' + stage + '-' + variant, 80, g => {
+    const lava = stage === 1;
+    const tones = lava ? ['#3c2a36', '#43303a', '#50363d', '#49313c'] : ['#1d413e', '#224943', '#273f3f', '#2a5146'];
+    g.fillStyle = lava ? '#1d151f' : '#122a2b';
+    g.fillRect(0, 0, 80, 80);
+    const stone = g.createLinearGradient(0, 0, 63, 78);
+    stone.addColorStop(0, tones[variant]);
+    stone.addColorStop(1, lava ? '#291c29' : '#1a3535');
+    shape(g, [[3, 12], [13, 3], [67, 3], [77, 14], [77, 68], [68, 77], [16, 77], [3, 66]], stone);
+    shape(g, [[3, 12], [13, 3], [67, 3], [77, 14], [66, 7], [15, 7]], '#e9c0a71c');
+    shape(g, [[77, 14], [77, 68], [68, 77], [16, 77], [69, 73], [74, 64]], '#080b166b');
+    g.strokeStyle = lava ? '#b67d6f51' : '#7ba38c38';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(15 + variant * 8, 5);
+    g.lineTo(19 + variant * 8, 19);
+    g.lineTo(25 + variant * 8, 22);
+    g.lineTo(23 + variant * 8, 39);
+    g.stroke();
+    if (variant === 0) {
+      glow(g, 63, 60, 19, lava ? '#f56a315f' : '#66df936b');
+      shape(g, [[63, 56], [66, 60], [63, 64], [60, 60]], lava ? '#ffc788' : '#a7f5bb');
+    }
+  });
+}
+function drawMap() {
+  const step = 80;
+  const left = Math.max(0, Math.floor(-offsetX / zoom / step) * step);
+  const top = Math.max(0, Math.floor(-offsetY / zoom / step) * step);
+  const right = Math.min(W, (width - offsetX) / zoom + step);
+  const bottom = Math.min(H, (height - offsetY) / zoom + step);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+  for (let y = top; y < bottom; y += step) {
+    for (let x = left; x < right; x += step) {
+      const pattern = Math.imul(14321, x / step + 1) ^ Math.imul(34919, y / step + 1);
+      ctx.drawImage(terrain((pattern >>> 2) % 4), x, y);
+    }
+  }
+  ctx.restore();
+  ctx.lineJoin = 'round';
+  for (const [weight, color] of (stage
+    ? [[32, '#a8322376'], [13, '#fe592b'], [4, '#ffcc79']]
+    : [[25, '#2a83644d'], [9, '#3e7c68'], [2, '#94c194']])) {
+    ctx.lineWidth = weight;
+    ctx.strokeStyle = color;
+    ctx.strokeRect(0, 0, W, H);
+  }
+}
+function crystal(isDrop) {
+  return sprite('crystal-' + stage + '-' + isDrop, 48, g => {
+    const rim = isDrop ? '#fc864ee0' : stage ? '#ffb956ac' : '#c7ff83bd';
+    glow(g, 24, 24, 22, rim);
+    const r = isDrop ? 9 : 6;
+    shape(g, [[24, 24 - r], [24 + r, 24], [24, 24 + r], [24 - r, 24]], isDrop ? '#ff923e' : '#a5e766');
+    shape(g, [[24, 24 - r], [24, 24], [24 - r, 24]], '#fff5af');
+    shape(g, [[24, 24], [24 + r, 24], [24, 24 + r]], isDrop ? '#b7393c' : '#559b52');
+  });
 }
 function draw() {
   ctx.fillStyle = stage ? '#24192a' : '#102a2c';
@@ -497,7 +646,7 @@ function draw() {
   const focus = active.length ? active : players;
   const cx = focus.length ? focus.reduce((sum, s) => sum + s.x, 0) / focus.length : W / 2;
   const cy = focus.length ? focus.reduce((sum, s) => sum + s.y, 0) / focus.length : H / 2;
-  zoom = clamp(Math.min(width / 590, height / 680), .42, 1.22);
+  zoom = clamp(Math.min(width / 490, height / 630), .42, 1.22);
   if (active.length === 2) {
     zoom = Math.min(zoom, width / (Math.abs(active[0].x - active[1].x) + 144),
       height / (Math.abs(active[0].y - active[1].y) + 200));
@@ -509,20 +658,39 @@ function draw() {
   ctx.scale(zoom, zoom);
   drawMap();
   for (const f of food) {
-    const r = f.value === 1 ? 4 : 7;
-    block(f.x - r - 4, f.y - r - 4, (r + 4) * 2, (r + 4) * 2, '#ffe08923');
-    pixelGem(f.x, f.y, r, f.value === 1 ? '#e9d982' : '#ffb373');
+    const size = f.value > 1 ? 38 : 23;
+    ctx.drawImage(crystal(f.value > 1), f.x - size / 2, f.y - size / 2, size, size);
   }
   for (const s of [...living(rivals), ...active]) drawSnake(s);
-  for (const spark of sparks) pixelGem(spark.x, spark.y, 6, '#fff2a6');
-  for (const ring of rings) {
-    ctx.strokeStyle = 'rgba(209, 255, 142, ' + ring.life / .45 + ')';
-    ctx.lineWidth = 4;
+  for (const spark of sparks) {
+    ctx.strokeStyle = '#ffa43e98';
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(ring.x, ring.y, 8 + (.45 - ring.life) * 180, 0, TAU);
+    ctx.moveTo(spark.x - spark.vx * .08, spark.y - spark.vy * .08);
+    ctx.lineTo(spark.x, spark.y);
     ctx.stroke();
+    ctx.drawImage(crystal(true), spark.x - 17, spark.y - 17, 34, 34);
+  }
+  for (const ring of rings) {
+    const radius = 8 + (.45 - ring.life) * 180;
+    ctx.save();
+    ctx.globalAlpha = ring.life / .45;
+    for (const [weight, color, shift] of [[12, '#ff51275c', 0], [3, '#ffe3a6', 0], [1, '#ff9e50', 7]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = weight;
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, radius + shift, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
   ctx.restore();
+  const vignette = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .28,
+    width / 2, height / 2, Math.hypot(width, height) / 2);
+  vignette.addColorStop(0, '#05071200');
+  vignette.addColorStop(1, '#05071278');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
   for (const touch of touches.values()) {
     const dx = touch.current.x - touch.start.x;
     const dy = touch.current.y - touch.start.y;
