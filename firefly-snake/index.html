@@ -93,6 +93,10 @@ function continueRun() {
   ({ mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats, players, rivals, food, rings, sparks } = run);
   for (const spark of sparks) spark.owner = players[spark.owner];
   for (const player of players) syncProfile(player);
+  for (const rival of rivals) {
+    rival.levelXP ??= Math.min(MAX_XP, rival.xp);
+    rival.level = levelOf(rival.levelXP);
+  }
   lastHud = -1;
   toast.hidden = true;
   resume();
@@ -135,7 +139,7 @@ function dialog(title, content, actions, emblem = false) {
 function menu() {
   state = 'menu';
   hud.hidden = hint.hidden = toast.hidden = true;
-  dialog('반딧불 뱀 탐험대', '빛나는 먹이를 모으고 상대 뱀의 길을 막아 몸집을 키워요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
+  dialog('반딧불 뱀 탐험대', '먹이와 나보다 레벨이 낮은 뱀을 먹어 성장해요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
     ...(save.run ? [['저장한 탐험 이어하기', continueRun]] : []),
     ['새로운 1인 탐험', () => start(1)], ['새로운 2인 탐험', () => start(2)],
     ['보물 수집함 · ' + save.relics.length + '/' + relics.length, collection]
@@ -168,7 +172,11 @@ function spawnRival() {
   const y = side < 2 ? random(110, H - 110) : (side === 2 ? 92 : H - 92);
   const rival = snake(x, y, Math.atan2(H / 2 - y, W / 2 - x), PALETTES[Math.floor(random(2, 5))]);
   rival.turn = 0;
-  rival.cautious = Math.random() < .55;
+  const active = living(players);
+  const opponent = active[rivals.length % active.length];
+  const offset = Math.floor(random(-3, stageTime < 12 && !stage ? 2 : 4));
+  rival.level = clamp(opponent.level + offset, 1, MAX_LEVEL);
+  rival.levelXP = (rival.level - 1) * XP_PER_LEVEL;
   rivals.push(rival);
 }
 function seedFood(n) {
@@ -190,7 +198,7 @@ function start(count) {
   seedFood(110);
   for (let i = 0; i < 5; i++) spawnRival();
   resume();
-  notify(count === 2 ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '상대의 머리가 내 몸통에 닿도록 길을 막아요', 5);
+  notify(count === 2 ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '나보다 레벨이 낮은 뱀을 먹어요. 같은 레벨은 튕겨요!', 5);
 }
 function resume() {
   state = 'play';
@@ -284,21 +292,21 @@ function steer(s, snakes, dt) {
   s.turn -= dt;
   if (s.turn <= 0) {
     s.turn = random(.25, .48);
-    const nearby = food.filter(f => distance(s, f) < 190);
-    const target = nearby.length ? nearby.reduce((a, b) => distance(s, a) < distance(s, b) ? a : b) :
-      { x: W / 2 + random(-290, 290), y: H / 2 + random(-390, 390) };
-    s.goal = Math.atan2(target.y - s.y, target.x - s.x) + random(-.23, .23);
+    const nearby = snakes.filter(other => other !== s && !other.shield && distance(s, other) < 230);
+    const threat = nearby.find(other => other.level > s.level && distance(s, other) < 135);
+    const prey = nearby.find(other => other.level < s.level);
+    if (threat) {
+      s.goal = Math.atan2(s.y - threat.y, s.x - threat.x);
+    } else {
+      const snack = food.reduce((nearest, item) =>
+        distance(s, item) < (nearest ? distance(s, nearest) : 190) ? item : nearest, null);
+      const target = prey ?? snack ?? {x: W / 2 + random(-290, 290), y: H / 2 + random(-390, 390)};
+      s.goal = Math.atan2(target.y - s.y, target.x - s.x) + random(-.18, .18);
+    }
   }
   const look = { x: s.x + Math.cos(s.heading) * 58, y: s.y + Math.sin(s.heading) * 58 };
   if (look.x < 38 || look.y < 38 || look.x > W - 38 || look.y > H - 38) {
     return Math.atan2(H / 2 - s.y, W / 2 - s.x);
-  }
-  for (const other of snakes) {
-    if (other === s || distance(s, other) > other.length * 13 + 75) continue;
-    if (other.body.some(part => distance(look, part) < 14) && s.cautious) {
-      s.goal = s.heading + 1.2;
-      return s.goal;
-    }
   }
   return s.goal;
 }
@@ -340,6 +348,9 @@ function grow(s, value) {
       syncProfile(s);
       persist();
     }
+  } else {
+    s.levelXP = Math.min(MAX_XP, (s.levelXP ?? s.xp - value) + value);
+    s.level = levelOf(s.levelXP);
   }
 }
 function scatter(s, owner) {
@@ -348,26 +359,58 @@ function scatter(s, owner) {
     const part = s.body[i];
     food.push({x: part.x + random(-6, 6), y: part.y + random(-6, 6), value: 3});
   }
+  if (owner?.alive) {
+    const attackerLevel = owner.level;
+    const reward = XP_PER_LEVEL + Math.floor(s.length / 4);
+    grow(owner, reward);
+    if (owner.player !== undefined) notify('Lv.' + formatLevel(s.level) + ' 뱀을 먹었어요 · 경험치 +' + reward);
+    if (s.player !== undefined) {
+      const player = mode === 2 ? (s.player + 1) + 'P가 ' : '';
+      notify(player + 'Lv.' + formatLevel(attackerLevel) + ' 뱀에게 먹혔어요.');
+      s.eatenBy = attackerLevel;
+    }
+  }
   if (owner?.player !== undefined && s.player === undefined) {
     defeats++;
     if (defeats === 1) discover('달빛 씨앗');
     if (stage === 1 && ++caveDefeats === 5) discover('불씨 왕관');
   }
 }
+function headTouchesBody(head, snake) {
+  return distance(head, snake) < snake.length * snake.spacing + 22 &&
+    snake.body.some(part => distance(head, part) < 16);
+}
+function rebound(snake, heading) {
+  snake.heading = heading;
+  snake.shield = .65;
+  if (snake.player === undefined) {
+    snake.goal = heading;
+    snake.turn = .65;
+  }
+}
 function collide(snakes) {
-  const collisions = new Map();
-  for (const s of snakes) {
-    if (s.shield) continue;
-    for (const other of snakes) {
-      if (s === other || (s.player !== undefined && other.player !== undefined)) continue;
-      if (distance(s, other) > other.length * 13 + 22) continue;
-      if (other.body.slice(1).some(part => distance(s, part) < 15)) {
-        collisions.set(s, other);
-        break;
+  // Resolve stronger snakes first and allow each head to engage once per frame.
+  const ready = snakes.filter(snake => !snake.shield).sort((a, b) => b.level - a.level);
+  const engaged = new Set();
+  for (let i = 0; i < ready.length; i++) {
+    const a = ready[i];
+    if (engaged.has(a)) continue;
+    for (let j = i + 1; j < ready.length; j++) {
+      const b = ready[j];
+      if (engaged.has(b) || (a.player !== undefined && b.player !== undefined)) continue;
+      if (distance(a, b) >= 23 && !headTouchesBody(a, b) && !headTouchesBody(b, a)) continue;
+      engaged.add(a);
+      engaged.add(b);
+      if (a.level > b.level) {
+        scatter(b, a);
+      } else {
+        const heading = distance(a, b) ? Math.atan2(a.y - b.y, a.x - b.x) : a.heading + Math.PI;
+        rebound(a, heading);
+        rebound(b, heading + Math.PI);
       }
+      break;
     }
   }
-  for (const [s, owner] of collisions) scatter(s, owner);
 }
 function useSkill(player, dt) {
   if (!player.skill) return;
@@ -401,8 +444,9 @@ function useSkill(player, dt) {
 }
 function end() {
   state = 'end';
+  const attacker = players.at(-1).eatenBy ?? players.find(player => player.eatenBy)?.eatenBy;
   dialog('이번 탐험이 끝났어요',
-    '최고 길이 ' + Math.max(...players.map(s => s.length)) + '마디 · 상대 뱀 ' + defeats + '마리<br>모은 보물 ' + save.relics.length + '/' + relics.length, [
+    (attacker ? 'Lv.' + formatLevel(attacker) + ' 뱀에게 먹혔어요.<br>' : '') + '최고 길이 ' + Math.max(...players.map(s => s.length)) + '마디 · 상대 뱀 ' + defeats + '마리<br>모은 보물 ' + save.relics.length + '/' + relics.length, [
       ['다시 탐험', () => start(mode)], ['보물 수집함', collection], ['처음으로', menu]
     ]);
 }
@@ -449,7 +493,7 @@ function update(dt) {
     spark.life -= dt;
     const target = living(rivals).find(r => !r.shield && distance(spark, r) < 18);
     if (target && spark.life > 0) {
-      if (target.tagged) scatter(target, spark.owner);
+      if (target.tagged && spark.owner.alive && spark.owner.level > target.level) scatter(target, spark.owner);
       else { target.tagged = true; target.turn = 1; target.goal = target.heading + 1.3; }
       spark.life = 0;
     }
@@ -569,13 +613,23 @@ function drawSnake(s) {
       ctx.arc(s.x, s.y, 22, 0, TAU);
       ctx.stroke();
     }
-    if (mode === 2) {
-      ctx.fillStyle = '#fff9df';
-      ctx.font = 'bold 16px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText((s.player + 1) + 'P', s.x, s.y - 27);
-    }
   }
+}
+function drawLevel(s) {
+  const label = (s.player !== undefined && mode === 2 ? (s.player + 1) + 'P · ' : '') + 'Lv. ' + formatLevel(s.level);
+  ctx.save();
+  ctx.translate(s.x, s.y - 26);
+  const size = Math.max(16, 12 / zoom);
+  ctx.font = 'bold ' + size + 'px system-ui';
+  ctx.textAlign = 'center';
+  const w = ctx.measureText(label).width + size * .75;
+  ctx.fillStyle = '#13131deb';
+  ctx.fillRect(-w / 2, -size, w, size * 1.36);
+  const player = mode === 1 ? players[0] : null;
+  ctx.fillStyle = s.player !== undefined ? s.color :
+    !player || s.level === player.level ? '#fff4d8' : s.level > player.level ? '#ff987e' : '#bdeca6';
+  ctx.fillText(label, 0, 0);
+  ctx.restore();
 }
 function terrain(variant) {
   return sprite('ground-' + stage + '-' + variant, 80, g => {
@@ -661,7 +715,8 @@ function draw() {
     const size = f.value > 1 ? 38 : 23;
     ctx.drawImage(crystal(f.value > 1), f.x - size / 2, f.y - size / 2, size, size);
   }
-  for (const s of [...living(rivals), ...active]) drawSnake(s);
+  const visibleSnakes = [...living(rivals), ...active];
+  for (const s of visibleSnakes) drawSnake(s);
   for (const spark of sparks) {
     ctx.strokeStyle = '#ffa43e98';
     ctx.lineWidth = 5;
@@ -684,6 +739,7 @@ function draw() {
     }
     ctx.restore();
   }
+  for (const s of visibleSnakes) drawLevel(s);
   ctx.restore();
   const vignette = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .28,
     width / 2, height / 2, Math.hypot(width, height) / 2);
