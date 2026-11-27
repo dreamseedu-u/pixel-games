@@ -73,7 +73,7 @@ const relics = ['달빛 씨앗', '용암 유리', '불씨 왕관'];
 const save = { best: 0, relics: [], skin: false, profiles: [{ xp: 0, skill: '' }, { xp: 0, skill: '' }], run: null };
 try { Object.assign(save, JSON.parse(localStorage.getItem('firefly-snake-v1'))); } catch {}
 let width, height, zoom, offsetX, offsetY;
-let players = [], rivals = [], food = [], sparks = [], rings = [];
+let players = [], rivals = [], sparks = [], rings = [];
 let state = 'menu', mode = 1, stage = 0, elapsed = 0, stageTime = 0;
 let cycle = 1;
 let skillPlayer = null;
@@ -86,6 +86,15 @@ const living = snakes => snakes.filter(snake => snake.alive);
 function levelOf(xp) {
   return 1 + Math.floor(xp / XP_PER_LEVEL);
 }
+const FORMS = [
+  {level: 1, name: '작은 뱀'},
+  {level: 10, name: '뿔뱀'},
+  {level: 25, name: '날개뱀'},
+  {level: 50, name: '용'}
+];
+function evolution(level) {
+  return Math.max(0, FORMS.findLastIndex(form => level >= form.level));
+}
 function formatLevel(level) {
   return level.toLocaleString('ko-KR');
 }
@@ -93,13 +102,13 @@ function saveRun() {
   // Clone the snapshot so further gameplay cannot mutate the saved run.
   save.run = JSON.parse(JSON.stringify({
     mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats,
-    players, rivals, food, rings, sparks: sparks.map(({owner, ...spark}) => ({...spark, owner: owner.player}))
+    players, rivals, rings, sparks: sparks.map(({owner, ...spark}) => ({...spark, owner: owner.player}))
   }));
   persist();
 }
 function continueRun() {
   const run = JSON.parse(JSON.stringify(save.run));
-  ({ mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats, players, rivals, food, rings, sparks } = run);
+  ({ mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats, players, rivals, rings, sparks } = run);
   for (const spark of sparks) spark.owner = players[spark.owner];
   for (const player of players) {
     player.body = player.body.slice(0, MAX_LENGTH);
@@ -153,7 +162,7 @@ function menu() {
   closeLink();
   state = 'menu';
   hud.hidden = hint.hidden = toast.hidden = true;
-  dialog('반딧불 뱀 탐험대', '먹이와 나보다 레벨이 낮은 뱀을 먹어 성장해요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
+  dialog('반딧불 뱀 탐험대', '나보다 레벨이 낮은 뱀의 몸통이나 꼬리를 물어 성장해요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
     ...(save.run ? [['저장한 탐험 이어하기', continueRun]] : []),
     ['새로운 1인 탐험', () => start(1)], ['2인 모드 · Wi-Fi 연결', wifiMenu],
     ['보물 수집함 · ' + save.relics.length + '/' + relics.length, collection]
@@ -180,7 +189,7 @@ function snake(x, y, heading, color, player) {
     }))
   };
 }
-function spawnRival() {
+function spawnRival(starter = false) {
   const side = Math.floor(random(0, 4));
   const x = side < 2 ? (side ? W - 92 : 92) : random(110, W - 110);
   const y = side < 2 ? random(110, H - 110) : (side === 2 ? 92 : H - 92);
@@ -189,12 +198,9 @@ function spawnRival() {
   const active = living(players);
   const opponent = active[rivals.length % active.length];
   const offset = Math.floor(random(-3, stageTime < 12 && !stage ? 2 : 4));
-  rival.level = clamp(opponent.level + offset, 1, MAX_LEVEL);
+  rival.level = starter ? 0 : clamp(opponent.level + offset, 0, MAX_LEVEL);
   rival.levelXP = (rival.level - 1) * XP_PER_LEVEL;
   rivals.push(rival);
-}
-function seedFood(n) {
-  for (let i = 0; i < n; i++) food.push({ x: random(35, W - 35), y: random(35, H - 35), value: 1 });
 }
 function start(count) {
   mode = count;
@@ -206,13 +212,11 @@ function start(count) {
   if (count === 2) players.push(snake(W / 2 + 52, H / 2, Math.PI / 2, PALETTES[1], 1));
   players.forEach(syncProfile);
   rivals = [];
-  food = [];
   sparks = [];
   rings = [];
-  seedFood(110);
-  for (let i = 0; i < 5; i++) spawnRival();
+  for (let i = 0; i < 5; i++) spawnRival(i < 2 && players.some(player => player.level === 1));
   resume();
-  notify(count === 2 && !link ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '나보다 레벨이 낮은 뱀을 먹어요. 같은 레벨은 튕겨요!', 5);
+  notify(count === 2 && !link ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '레벨이 낮은 뱀의 몸통이나 꼬리를 물어 보세요!', 5);
 }
 function resume() {
   state = 'play';
@@ -318,9 +322,7 @@ function steer(s, snakes, dt) {
     if (threat) {
       s.goal = Math.atan2(s.y - threat.y, s.x - threat.x);
     } else {
-      const snack = food.reduce((nearest, item) =>
-        distance(s, item) < (nearest ? distance(s, nearest) : 190) ? item : nearest, null);
-      const target = prey ?? snack ?? {x: W / 2 + random(-290, 290), y: H / 2 + random(-390, 390)};
+      const target = (prey && (prey.body.at(-1) ?? prey)) ?? {x: W / 2 + random(-290, 290), y: H / 2 + random(-390, 390)};
       s.goal = Math.atan2(target.y - s.y, target.x - s.x) + random(-.18, .18);
     }
   }
@@ -355,9 +357,11 @@ function advance(s, target, dt) {
   }
 }
 function grow(s, value) {
+  const previousGrowth = Math.floor(s.xp / 3);
   s.xp += value;
-  const length = Math.min(s.player === undefined ? 24 : MAX_LENGTH, 7 + Math.floor(s.xp / 3));
-  while (s.body.length < length) s.body.push({ ...s.body.at(-1) });
+  const extra = Math.floor(s.xp / 3) - previousGrowth;
+  const length = Math.min(s.player === undefined ? 24 : MAX_LENGTH, s.length + extra);
+  while (s.body.length < length) s.body.push({...s.body.at(-1) ?? {x: s.x, y: s.y}});
   s.length = length;
   if (s.player !== undefined) {
     const profile = save.profiles[s.player];
@@ -373,15 +377,11 @@ function grow(s, value) {
     s.level = levelOf(s.levelXP);
   }
 }
-function scatter(s, owner) {
+function eatSnake(s, owner) {
   s.alive = false;
-  for (let i = 0; i < s.body.length; i += 2) {
-    const part = s.body[i];
-    food.push({x: part.x + random(-6, 6), y: part.y + random(-6, 6), value: 3});
-  }
   if (owner?.alive) {
     const attackerLevel = owner.level;
-    const reward = XP_PER_LEVEL + Math.floor(s.length / 4);
+    const reward = 3 + Math.floor(s.length / 2);
     grow(owner, reward);
     if (owner.player !== undefined) notify('Lv.' + formatLevel(s.level) + ' 뱀을 먹었어요 · 경험치 +' + reward);
     if (s.player !== undefined) {
@@ -396,9 +396,26 @@ function scatter(s, owner) {
     if (stage === 1 && ++caveDefeats === 5) discover('불씨 왕관');
   }
 }
-function headTouchesBody(head, snake) {
-  return distance(head, snake) < snake.length * snake.spacing + 22 &&
-    snake.body.some(part => distance(head, part) < 8 * (bodyScale(head) + bodyScale(snake)));
+function biteIndex(head, snake) {
+  if (distance(head, snake) > snake.length * snake.spacing + 22) return -1;
+  let index = -1;
+  let nearest = 8 * (bodyScale(head) + bodyScale(snake));
+  for (let i = 0; i < snake.body.length; i++) {
+    const gap = distance(head, snake.body[i]);
+    if (gap <= nearest) {
+      nearest = gap;
+      index = i;
+    }
+  }
+  return index;
+}
+function biteBody(attacker, target, index) {
+  const removed = target.body.length - index;
+  target.body.length = target.length = index;
+  target.shield = .8;
+  grow(attacker, removed);
+  if (attacker.player !== undefined) notify('꼬리 ' + removed + '마디를 먹었어요 · 경험치 +' + removed);
+  if (target.player !== undefined) notify('몸통이 잘렸어요 · ' + removed + '마디를 잃었어요.');
 }
 function rebound(snake, heading) {
   snake.heading = heading;
@@ -418,11 +435,16 @@ function collide(snakes) {
     for (let j = i + 1; j < ready.length; j++) {
       const b = ready[j];
       if (engaged.has(b) || (a.player !== undefined && b.player !== undefined)) continue;
-      if (distance(a, b) >= 11.5 * (bodyScale(a) + bodyScale(b)) && !headTouchesBody(a, b) && !headTouchesBody(b, a)) continue;
+      // The smaller head radius distinguishes a neck or mid-body bite from a head bite.
+      const heads = distance(a, b) < 9 * (bodyScale(a) + bodyScale(b));
+      const cut = biteIndex(a, b);
+      if (!heads && cut < 0 && biteIndex(b, a) < 0) continue;
       engaged.add(a);
       engaged.add(b);
-      if (a.level > b.level) {
-        scatter(b, a);
+      if (a.level > b.level && heads) {
+        eatSnake(b, a);
+      } else if (a.level > b.level && cut >= 0) {
+        biteBody(a, b, cut);
       } else {
         const heading = distance(a, b) ? Math.atan2(a.y - b.y, a.x - b.x) : a.heading + Math.PI;
         rebound(a, heading);
@@ -447,12 +469,7 @@ function useSkill(player, dt) {
       target.turn = .85;
       target.x = clamp(target.x + Math.cos(target.heading) * 32, 18, W - 18);
       target.y = clamp(target.y + Math.sin(target.heading) * 32, 18, H - 18);
-      if (target.length > 7) {
-        const tip = target.body.pop();
-        target.xp = Math.max(0, target.xp - 3);
-        target.length = target.body.length;
-        food.push({...tip, value: 3});
-      }
+
     }
   } else {
     const target = targets.filter(r => distance(player, r) < 270).sort((a,b) => distance(player,a) - distance(player,b))[0];
@@ -475,7 +492,6 @@ function nextRegion() {
   if (!stage) cycle++;
   caveDefeats = 0;
   stageTime = 0;
-  food = [];
   rivals = [];
   sparks = [];
   rings = [];
@@ -484,11 +500,10 @@ function nextRegion() {
     s.x = position.x;
     s.y = position.y;
     s.heading = position.heading;
-    s.body = position.body;
+    s.body = position.body.slice(0, s.length);
     while (s.body.length < s.length) s.body.push({...s.body.at(-1)});
     s.shield = 4;
   }
-  seedFood(stage ? 120 : 110);
   for (let i = 0; i < (stage ? 7 : 6); i++) spawnRival();
   if (stage) discover('용암 유리');
   notify(stage ? '용암굴 도착 · 60초 동안 살아남아요!' : '반딧불 숲으로 돌아왔어요 · ' + cycle + '번째 순환', 5);
@@ -502,9 +517,6 @@ function update(dt) {
   collide(snakes);
   for (const s of snakes) {
     if (!s.alive) continue;
-    for (let i = food.length - 1; i >= 0; i--) {
-      if (distance(s, food[i]) < 23) grow(s, food.splice(i, 1)[0].value);
-    }
     if (s.player !== undefined) useSkill(s, dt);
   }
   for (const spark of sparks) {
@@ -513,7 +525,7 @@ function update(dt) {
     spark.life -= dt;
     const target = living(rivals).find(r => !r.shield && distance(spark, r) < 18);
     if (target && spark.life > 0) {
-      if (target.tagged && spark.owner.alive && spark.owner.level > target.level) scatter(target, spark.owner);
+      if (target.tagged && spark.owner.alive && spark.owner.level > target.level) eatSnake(target, spark.owner);
       else { target.tagged = true; target.turn = 1; target.goal = target.heading + 1.3; }
       spark.life = 0;
     }
@@ -530,8 +542,9 @@ function update(dt) {
   rivalTimer += dt;
   if (rivalTimer > 1.3) {
     rivalTimer = 0;
-    if (rivals.length < (stage ? 8 : 6)) spawnRival();
-    if (food.length < 110) seedFood(Math.min(12, 110 - food.length));
+    const starterPlayer = living(players).some(player => player.level === 1);
+    const needsStarter = starterPlayer && !rivals.some(rival => rival.level === 0);
+    if (needsStarter || rivals.length < (stage ? 8 : 6)) spawnRival(needsStarter);
   }
   const tick = Math.floor(elapsed * 5);
   if (tick !== lastHud) {
@@ -541,7 +554,7 @@ function update(dt) {
     const xp = save.profiles[0].xp;
     const progress = xp === MAX_XP ? 100 : (xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100;
     stats.innerHTML = (stage ? '용암굴 · ' + Math.max(0, Math.ceil(60 - stageTime)) + '초' : '반딧불 숲') +
-      ' · ' + cycle + '순환<br>' + status + '<div id="progress" aria-hidden="true"><b style="width:' + progress + '%"></b></div>';
+      ' · ' + cycle + '순환<br>' + status + (mode === 1 ? ' · ' + FORMS[evolution(players[0].level)].name : '') + '<div id="progress" aria-hidden="true"><b style="width:' + progress + '%"></b></div>';
   }
 }
 
@@ -570,11 +583,13 @@ function glow(g, x, y, radius, color) {
   g.fillStyle = light;
   g.fillRect(x - radius, y - radius, radius * 2, radius * 2);
 }
-function armor(color, head) {
-  return sprite(color + head, 80, g => {
+function armor(color, head, form = 0) {
+  return sprite(color + head + form, 80, g => {
     g.translate(40, 40);
     g.scale(2, 2);
-    const outline = head
+    const outline = head && form === 0
+      ? [[-12, -6], [-6, -10], [5, -10], [13, -6], [15, 0], [13, 6], [5, 10], [-6, 10], [-12, 6]]
+      : head
       ? [[-13, -8], [-3, -14], [7, -14], [15, -7], [17, 0], [15, 7], [7, 14], [-3, 14], [-13, 8], [-15, 0]]
       : [[-9, -6], [-4, -11], [4, -11], [10, -6], [11, 0], [10, 6], [4, 11], [-4, 11], [-9, 6], [-11, 0]];
     const metal = g.createLinearGradient(-6, -13, 4, 14);
@@ -600,7 +615,13 @@ function armor(color, head) {
       for (const side of [-1, 1]) {
         shape(g, [[3, side * 6], [11, side * 4], [9, side * 9], [5, side * 10]], '#21172a');
         shape(g, [[5, side * 7], [9, side * 5], [8, side * 8], [6, side * 9]], '#fff3b5');
-        shape(g, [[-8, side * 9], [-14, side * 15], [-4, side * 11]], color);
+        if (form >= 1) {
+          shape(g, [[-6, side * 9], [-17, side * 17], [-11, side * 8], [-4, side * 8]], '#ffe5a7');
+        }
+        if (form === 3) {
+          shape(g, [[-2, side * 11], [0, side * 17], [6, side * 12]], color);
+          shape(g, [[7, side * 2], [19, side * 6], [15, side * 2]], '#ffbc59');
+        }
       }
     } else {
       shape(g, [[-8, -4], [-3, -7], [3, -7], [7, -4], [1, -5]], '#fff7d778');
@@ -608,7 +629,22 @@ function armor(color, head) {
     }
   });
 }
+function wings(color, form) {
+  return sprite('wings-' + color + form, 96, g => {
+    g.translate(48, 48);
+    for (const side of [-1, 1]) {
+      const outline = [[10, side * 4], [16, side * 18], [-2, side * 43], [-8, side * 28], [-19, side * 34], [-21, side * 21], [-30, side * 24], [-18, side * 7]];
+      shape(g, outline, '#19101d');
+      g.save();
+      g.scale(.9, .9);
+      shape(g, outline, color);
+      shape(g, [[9, side * 10], [-4, side * 36], [-8, side * 23], [-19, side * 30], [-14, side * 13]], form === 3 ? '#ffc16cc9' : '#fcf5c561');
+      g.restore();
+    }
+  });
+}
 function drawSnake(s) {
+  const form = evolution(s.level);
   const body = armor(s.color, false);
   const growth = bodyScale(s);
   for (let i = s.body.length - 1; i >= 0; i--) {
@@ -624,7 +660,11 @@ function drawSnake(s) {
   ctx.save();
   ctx.translate(s.x, s.y);
   ctx.rotate(s.heading);
-  ctx.drawImage(armor(s.color, true), -24 * growth, -24 * growth, 48 * growth, 48 * growth);
+  if (form >= 2) {
+    const size = (form === 3 ? 65 : 54) * growth;
+    ctx.drawImage(wings(s.color, form), -size / 2 - 8, -size / 2, size, size);
+  }
+  ctx.drawImage(armor(s.color, true, form), -24 * growth, -24 * growth, 48 * growth, 48 * growth);
   ctx.restore();
   if (s.player !== undefined) {
     if (s.shield > 0) {
@@ -672,10 +712,7 @@ function terrain(variant) {
     g.lineTo(25 + variant * 8, 22);
     g.lineTo(23 + variant * 8, 39);
     g.stroke();
-    if (variant === 0) {
-      glow(g, 63, 60, 19, lava ? '#f56a315f' : '#66df936b');
-      shape(g, [[63, 56], [66, 60], [63, 64], [60, 60]], lava ? '#ffc788' : '#a7f5bb');
-    }
+
   });
 }
 function drawMap() {
@@ -704,14 +741,12 @@ function drawMap() {
     ctx.strokeRect(0, 0, W, H);
   }
 }
-function crystal(isDrop) {
-  return sprite('crystal-' + stage + '-' + isDrop, 48, g => {
-    const rim = isDrop ? '#fc864ee0' : stage ? '#ffb956ac' : '#c7ff83bd';
-    glow(g, 24, 24, 22, rim);
-    const r = isDrop ? 9 : 6;
-    shape(g, [[24, 24 - r], [24 + r, 24], [24, 24 + r], [24 - r, 24]], isDrop ? '#ff923e' : '#a5e766');
-    shape(g, [[24, 24 - r], [24, 24], [24 - r, 24]], '#fff5af');
-    shape(g, [[24, 24], [24 + r, 24], [24, 24 + r]], isDrop ? '#b7393c' : '#559b52');
+function sparkArt() {
+  return sprite('spark', 48, g => {
+    glow(g, 24, 24, 22, '#fc864ee0');
+    shape(g, [[24, 15], [33, 24], [24, 33], [15, 24]], '#ff923e');
+    shape(g, [[24, 15], [24, 24], [15, 24]], '#fff5af');
+    shape(g, [[24, 24], [33, 24], [24, 33]], '#b7393c');
   });
 }
 function draw() {
@@ -737,10 +772,6 @@ function draw() {
   ctx.translate(offsetX, offsetY);
   ctx.scale(zoom, zoom);
   drawMap();
-  for (const f of food) {
-    const size = f.value > 1 ? 38 : 23;
-    ctx.drawImage(crystal(f.value > 1), f.x - size / 2, f.y - size / 2, size, size);
-  }
   const visibleSnakes = [...living(rivals), ...active];
   for (const s of visibleSnakes) drawSnake(s);
   for (const spark of sparks) {
@@ -750,7 +781,7 @@ function draw() {
     ctx.moveTo(spark.x - spark.vx * .08, spark.y - spark.vy * .08);
     ctx.lineTo(spark.x, spark.y);
     ctx.stroke();
-    ctx.drawImage(crystal(true), spark.x - 17, spark.y - 17, 34, 34);
+    ctx.drawImage(sparkArt(), spark.x - 17, spark.y - 17, 34, 34);
   }
   for (const ring of rings) {
     const radius = 8 + (.45 - ring.life) * 180;
@@ -949,13 +980,13 @@ function syncLink(time) {
   if (!link?.ready || time < link.nextSend) return;
   link.nextSend = time + (link.role === 'host' ? 67 : 45);
   if (link.role === 'host') {
-    sendLink({type: 'world', state, skillPlayer, stage, elapsed, players, rivals, food, sparks, rings});
+    sendLink({type: 'world', state, skillPlayer, stage, elapsed, players, rivals, sparks, rings});
   } else if (state === 'play') {
     sendLink({type: 'steer', heading: control({player: 1})});
   }
 }
 function receiveWorld(packet) {
-  ({stage, elapsed, players, rivals, food, sparks, rings} = packet);
+  ({stage, elapsed, players, rivals, sparks, rings} = packet);
   mode = 2;
   // Text-only HUD for the remote device.
   stats.textContent = players.map((snake, i) => (i + 1) + 'P ' +
