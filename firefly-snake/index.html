@@ -33,6 +33,10 @@ p{line-height:1.55;color:#d1d9e3}
 #emblem i{display:block;background:#8bc661;width:28px;height:24px;border:3px solid #233d3e;box-shadow:inset 0 5px #c9ed88;border-radius:7px;margin-right:-5px}
 #emblem i:last-child{background:#c9ed88;width:34px;position:relative;box-shadow:inset 0 -6px #8bc661}
 #emblem i:last-child::after{content:'';position:absolute;right:4px;top:5px;width:4px;height:5px;background:#263549;box-shadow:0 8px #263549}
+.wifi-fields{display:grid;gap:8px;text-align:left}
+.wifi-fields label{display:grid;gap:4px}
+.wifi-fields textarea,.wifi-fields button{font:inherit;padding:8px;color:#fff9df;background:#242033;border:1px solid #9a7c59;border-radius:8px;width:100%}
+.wifi-fields p{min-height:1.5em;margin:0}
 </style>
 </head>
 <body>
@@ -57,6 +61,10 @@ const W = 1080;
 const H = 1440;
 const PALETTES = ['#93ce4a', '#44bcea', '#e96047', '#a36cea', '#e6af46'];
 const MAX_LEVEL = 9999;
+const MAX_LENGTH = 44;
+function bodyScale(snake) {
+  return 1 + Math.min(.3, Math.max(0, (snake.length - 7) * .009));
+}
 const SKILL_LEVEL = 50;
 const XP_PER_LEVEL = 8;
 const MAX_XP = (MAX_LEVEL - 1) * XP_PER_LEVEL;
@@ -68,6 +76,7 @@ let width, height, zoom, offsetX, offsetY;
 let players = [], rivals = [], food = [], sparks = [], rings = [];
 let state = 'menu', mode = 1, stage = 0, elapsed = 0, stageTime = 0;
 let cycle = 1;
+let skillPlayer = null;
 let rivalTimer = 0, defeats = 0, caveDefeats = 0, noticeUntil = 0, lastHud = -1;
 const random = (min, max) => min + Math.random() * (max - min);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
@@ -92,7 +101,11 @@ function continueRun() {
   const run = JSON.parse(JSON.stringify(save.run));
   ({ mode, stage, cycle, elapsed, stageTime, rivalTimer, defeats, caveDefeats, players, rivals, food, rings, sparks } = run);
   for (const spark of sparks) spark.owner = players[spark.owner];
-  for (const player of players) syncProfile(player);
+  for (const player of players) {
+    player.body = player.body.slice(0, MAX_LENGTH);
+    player.length = player.body.length;
+    syncProfile(player);
+  }
   for (const rival of rivals) {
     rival.levelXP ??= Math.min(MAX_XP, rival.xp);
     rival.level = levelOf(rival.levelXP);
@@ -137,11 +150,12 @@ function dialog(title, content, actions, emblem = false) {
   list.firstElementChild?.focus({ preventScroll: true });
 }
 function menu() {
+  closeLink();
   state = 'menu';
   hud.hidden = hint.hidden = toast.hidden = true;
   dialog('반딧불 뱀 탐험대', '먹이와 나보다 레벨이 낮은 뱀을 먹어 성장해요.<br>내 레벨 ' + formatLevel(levelOf(save.profiles[0].xp)) + ' / ' + formatLevel(MAX_LEVEL), [
     ...(save.run ? [['저장한 탐험 이어하기', continueRun]] : []),
-    ['새로운 1인 탐험', () => start(1)], ['새로운 2인 탐험', () => start(2)],
+    ['새로운 1인 탐험', () => start(1)], ['2인 모드 · Wi-Fi 연결', wifiMenu],
     ['보물 수집함 · ' + save.relics.length + '/' + relics.length, collection]
   ], true);
 }
@@ -198,19 +212,23 @@ function start(count) {
   seedFood(110);
   for (let i = 0; i < 5; i++) spawnRival();
   resume();
-  notify(count === 2 ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '나보다 레벨이 낮은 뱀을 먹어요. 같은 레벨은 튕겨요!', 5);
+  notify(count === 2 && !link ? '왼쪽과 오른쪽을 나눠 드래그하세요' : '나보다 레벨이 낮은 뱀을 먹어요. 같은 레벨은 튕겨요!', 5);
 }
 function resume() {
   state = 'play';
   document.activeElement?.blur();
   overlay.hidden = true;
   hud.hidden = hint.hidden = false;
-  hint.textContent = mode === 2 ? '왼쪽 · 1P  |  오른쪽 · 2P' : '누른 곳에서 드래그해 이동';
+  hint.textContent = link?.ready ? 'Wi-Fi 연결 · 내 뱀을 드래그해 이동' : mode === 2 ? '왼쪽 · 1P  |  오른쪽 · 2P' : '누른 곳에서 드래그해 이동';
 }
 function pause() {
   if (state !== 'play') return;
+  if (link?.role === 'guest') {
+    sendLink({type: 'pause'});
+    return;
+  }
   state = 'pause';
-  dialog('일시정지', mode === 2 ? '키보드에서는 1P WASD · 2P 방향키를 사용해요.' : '키보드에서는 방향키 또는 WASD로 움직여요.', [
+  dialog('일시정지', link?.ready ? '두 기기의 게임이 함께 일시정지됩니다.' : mode === 2 ? '키보드에서는 1P WASD · 2P 방향키를 사용해요.' : '키보드에서는 방향키 또는 WASD로 움직여요.', [
     ['계속하기', resume],
     ['현재 탐험 저장하고 처음으로', () => { saveRun(); menu(); }],
     ['처음으로', menu]
@@ -236,6 +254,7 @@ function setSkill(player, skill) {
 }
 function chooseSkill(snake) {
   state = 'skill';
+  skillPlayer = snake.player;
   dialog(mode === 2 ? (snake.player + 1) + 'P · 첫 자동 기술' : '첫 자동 기술', '레벨 ' + SKILL_LEVEL + '에 도달했어요. 앞으로 함께할 기술을 골라요.', [
     ['반딧불 고리 · 가까운 상대를 밀어내요', () => setSkill(snake, 'ring')],
     ['별빛 화살 · 먼 상대를 겨눠요', () => setSkill(snake, 'bolt')]
@@ -247,7 +266,7 @@ function point(event) {
 canvas.addEventListener('pointerdown', event => {
   if (state !== 'play') return;
   const p = point(event);
-  const player = mode === 2 && p.x >= width / 2 ? 1 : 0;
+  const player = link?.ready ? Number(link.role === 'guest') : mode === 2 && p.x >= width / 2 ? 1 : 0;
   if ([...touches.values()].some(touch => touch.player === player)) return;
   touches.set(event.pointerId, { start: p, current: p, player });
   canvas.setPointerCapture(event.pointerId);
@@ -275,8 +294,9 @@ window.addEventListener('blur', pause);
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
 function control(s) {
-  const arrows = s.player === 1 || mode === 1;
-  const wasd = s.player === 0;
+  if (link?.ready && link.role === 'host' && s.player === 1) return link.heading;
+  const arrows = link?.ready || s.player === 1 || mode === 1;
+  const wasd = link?.ready || s.player === 0;
   const held = (arrow, letter) => (arrows && keys.has(arrow)) || (wasd && keys.has(letter));
   const touch = [...touches.values()].find(t => t.player === s.player);
   if (touch) {
@@ -336,7 +356,7 @@ function advance(s, target, dt) {
 }
 function grow(s, value) {
   s.xp += value;
-  const length = Math.min(s.player === undefined ? 24 : 68, 7 + Math.floor(s.xp / 3));
+  const length = Math.min(s.player === undefined ? 24 : MAX_LENGTH, 7 + Math.floor(s.xp / 3));
   while (s.body.length < length) s.body.push({ ...s.body.at(-1) });
   s.length = length;
   if (s.player !== undefined) {
@@ -378,7 +398,7 @@ function scatter(s, owner) {
 }
 function headTouchesBody(head, snake) {
   return distance(head, snake) < snake.length * snake.spacing + 22 &&
-    snake.body.some(part => distance(head, part) < 16);
+    snake.body.some(part => distance(head, part) < 8 * (bodyScale(head) + bodyScale(snake)));
 }
 function rebound(snake, heading) {
   snake.heading = heading;
@@ -398,7 +418,7 @@ function collide(snakes) {
     for (let j = i + 1; j < ready.length; j++) {
       const b = ready[j];
       if (engaged.has(b) || (a.player !== undefined && b.player !== undefined)) continue;
-      if (distance(a, b) >= 23 && !headTouchesBody(a, b) && !headTouchesBody(b, a)) continue;
+      if (distance(a, b) >= 11.5 * (bodyScale(a) + bodyScale(b)) && !headTouchesBody(a, b) && !headTouchesBody(b, a)) continue;
       engaged.add(a);
       engaged.add(b);
       if (a.level > b.level) {
@@ -590,10 +610,11 @@ function armor(color, head) {
 }
 function drawSnake(s) {
   const body = armor(s.color, false);
+  const growth = bodyScale(s);
   for (let i = s.body.length - 1; i >= 0; i--) {
     const p = s.body[i];
     const target = s.body[i - 1] ?? s;
-    const size = 40 * Math.max(.55, 1 - Math.max(0, i - s.body.length + 5) * .1);
+    const size = 40 * growth * Math.max(.55, 1 - Math.max(0, i - s.body.length + 5) * .1);
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(Math.atan2(target.y - p.y, target.x - p.x));
@@ -603,7 +624,7 @@ function drawSnake(s) {
   ctx.save();
   ctx.translate(s.x, s.y);
   ctx.rotate(s.heading);
-  ctx.drawImage(armor(s.color, true), -24, -24, 48, 48);
+  ctx.drawImage(armor(s.color, true), -24 * growth, -24 * growth, 48 * growth, 48 * growth);
   ctx.restore();
   if (s.player !== undefined) {
     if (s.shield > 0) {
@@ -618,7 +639,7 @@ function drawSnake(s) {
 function drawLevel(s) {
   const label = (s.player !== undefined && mode === 2 ? (s.player + 1) + 'P · ' : '') + 'Lv. ' + formatLevel(s.level);
   ctx.save();
-  ctx.translate(s.x, s.y - 26);
+  ctx.translate(s.x, s.y - 26 * bodyScale(s));
   const size = Math.max(16, 12 / zoom);
   ctx.font = 'bold ' + size + 'px system-ui';
   ctx.textAlign = 'center';
@@ -697,11 +718,16 @@ function draw() {
   ctx.fillStyle = stage ? '#24192a' : '#102a2c';
   ctx.fillRect(0, 0, width, height);
   const active = living(players);
-  const focus = active.length ? active : players;
+  const local = link?.ready ? players[Number(link.role === 'guest')] : null;
+  const focus = local?.alive ? [local] : active.length ? active : players;
   const cx = focus.length ? focus.reduce((sum, s) => sum + s.x, 0) / focus.length : W / 2;
   const cy = focus.length ? focus.reduce((sum, s) => sum + s.y, 0) / focus.length : H / 2;
   zoom = clamp(Math.min(width / 490, height / 630), .42, 1.22);
-  if (active.length === 2) {
+  if (focus.length) {
+    const longest = Math.max(...focus.map(snake => snake.length));
+    zoom *= 1 - Math.min(.2, Math.max(0, (longest - 7) * .0055));
+  }
+  if (!local && active.length === 2) {
     zoom = Math.min(zoom, width / (Math.abs(active[0].x - active[1].x) + 144),
       height / (Math.abs(active[0].y - active[1].y) + 200));
   }
@@ -762,6 +788,197 @@ function draw() {
     }
   }
 }
+let link = null;
+function closeLink() {
+  const current = link;
+  link = null;
+  current?.channel?.close();
+  current?.peer.close();
+}
+function wifiMenu() {
+  state = 'wifi';
+  dialog('Wi-Fi 2인 연결', '두 기기를 같은 Wi-Fi에 연결하세요. 한 기기에서 방을 만들고, 다른 기기에서 초대 코드를 입력하세요.', [
+    ['방 만들기', () => connectionScreen('host')],
+    ...(save.run?.mode === 2 ? [['저장한 2인 탐험으로 방 만들기', () => connectionScreen('host', true)]] : []),
+    ['방 참가', () => connectionScreen('guest')],
+    ['한 화면에서 2인 플레이', () => start(2)],
+    ['처음으로', menu]
+  ]);
+}
+function connectionScreen(role, restore = false) {
+  state = 'wifi';
+  const host = role === 'host';
+  dialog(host ? 'Wi-Fi 방 만들기' : 'Wi-Fi 방 참가', host
+    ? '초대 코드를 두 번째 기기로 보낸 뒤, 그 기기에서 만든 응답 코드를 아래에 붙여넣으세요.'
+    : '방을 만든 기기에서 받은 초대 코드를 붙여넣으세요. 생성된 응답 코드를 방장에게 보내세요.', [
+      [host ? '응답 코드로 연결' : '응답 코드 만들기', applyConnection],
+      ['Wi-Fi 메뉴', () => { closeLink(); wifiMenu(); }]
+    ]);
+  const fields = document.createElement('div');
+  fields.className = 'wifi-fields';
+  fields.innerHTML = '<label>' + (host ? '초대 코드' : '응답 코드') +
+    '<textarea readonly spellcheck="false" rows="2"></textarea></label><button type="button">코드 복사</button><label>' +
+    (host ? '받은 응답 코드' : '받은 초대 코드') + '<textarea spellcheck="false" rows="2"></textarea></label><p role="status"></p>';
+  panel.querySelector('.actions').before(fields);
+  const [output, input] = fields.querySelectorAll('textarea');
+  const message = fields.querySelector('[role="status"]');
+  const copy = fields.querySelector('button');
+  copy.disabled = true;
+  if (!window.RTCPeerConnection) {
+    message.textContent = '이 브라우저에서는 Wi-Fi 연결을 사용할 수 없어요.';
+    return;
+  }
+  const current = {role, restore, peer: new RTCPeerConnection({iceServers: []}), channel: null, input, output, message, copy,
+    busy: false, ready: false, heading: null, nextSend: 0};
+  link = current;
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(output.value);
+      message.textContent = '코드를 복사했어요.';
+    } catch {
+      output.select();
+      message.textContent = '선택된 코드를 복사 메뉴로 복사하세요.';
+    }
+  };
+  current.peer.onconnectionstatechange = () => {
+    if (link !== current) return;
+    if (current.peer.connectionState === 'failed' || current.peer.connectionState === 'closed') {
+      connectionLost();
+    }
+  };
+  if (host) {
+    attachChannel(current, current.peer.createDataChannel('firefly'));
+    prepareConnection(current, 'offer');
+  } else {
+    current.peer.ondatachannel = event => attachChannel(current, event.channel);
+  }
+}
+function connectionLost() {
+  closeLink();
+  state = 'wifi';
+  hud.hidden = hint.hidden = toast.hidden = true;
+  dialog('연결이 끊겼어요', '두 기기가 같은 Wi-Fi에 연결되어 있는지 확인하고 다시 연결하세요.', [
+    ['Wi-Fi 메뉴', wifiMenu], ['처음으로', menu]
+  ]);
+}
+async function prepareConnection(current, type) {
+  current.busy = true;
+  current.message.textContent = '연결 코드를 준비하고 있어요…';
+  try {
+    const {peer} = current;
+    await peer.setLocalDescription(type === 'offer' ? await peer.createOffer() : await peer.createAnswer());
+    if (peer.iceGatheringState !== 'complete') {
+      await new Promise((resolve, reject) => {
+        const check = () => {
+          if (peer.iceGatheringState !== 'complete') return;
+          clearTimeout(timer);
+          peer.removeEventListener('icegatheringstatechange', check);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          peer.removeEventListener('icegatheringstatechange', check);
+          reject(new Error('ICE gathering timed out'));
+        }, 10000);
+        peer.addEventListener('icegatheringstatechange', check);
+        check();
+      });
+    }
+    if (link !== current) return;
+    current.output.value = btoa(JSON.stringify(peer.localDescription.toJSON()));
+    current.copy.disabled = false;
+    current.message.textContent = type === 'offer' ? '초대 코드가 준비됐어요.' : '응답 코드를 방장에게 보내면 탐험이 시작돼요.';
+  } catch {
+    if (link === current) current.message.textContent = '코드를 만들지 못했어요. Wi-Fi 메뉴에서 다시 시도하세요.';
+  } finally {
+    current.busy = false;
+  }
+}
+async function applyConnection() {
+  const current = link;
+  if (!current || current.busy) return;
+  const host = current.role === 'host';
+  if (host && !current.output.value) return;
+  current.busy = true;
+  try {
+    const code = current.input.value.trim();
+    if (code.length > 24000) throw new Error('Invalid connection code');
+    const data = JSON.parse(atob(code));
+    if (data.type !== (host ? 'answer' : 'offer') || typeof data.sdp !== 'string') throw new Error('Invalid connection code');
+    await current.peer.setRemoteDescription(data);
+    if (link !== current) return;
+    if (host) current.message.textContent = '두 기기를 연결하고 있어요…';
+    else await prepareConnection(current, 'answer');
+  } catch {
+    current.message.textContent = '코드를 읽을 수 없어요. 코드 전체를 다시 복사해서 붙여넣으세요.';
+  } finally {
+    current.busy = false;
+  }
+}
+function attachChannel(current, channel) {
+  current.channel = channel;
+  channel.onclose = () => { if (link === current) connectionLost(); };
+  channel.onopen = () => {
+    if (link !== current) return;
+    current.ready = true;
+    if (current.role === 'host') {
+      if (current.restore) continueRun();
+      else start(2);
+    }
+  };
+  channel.onmessage = event => {
+    if (link !== current || typeof event.data !== 'string' || event.data.length > 100000) return;
+    try {
+      const packet = JSON.parse(event.data);
+      if (current.role === 'host') {
+        if (packet.type === 'steer') current.heading = Number.isFinite(packet.heading) ? clamp(packet.heading, -Math.PI, Math.PI) : null;
+        if (packet.type === 'pause') pause();
+        if (packet.type === 'skill' && state === 'skill' && skillPlayer === 1 && ['ring', 'bolt'].includes(packet.skill)) {
+          setSkill(players[1], packet.skill);
+        }
+      } else if (packet.type === 'world') {
+        receiveWorld(packet);
+      }
+    } catch {}
+  };
+}
+function sendLink(packet) {
+  const channel = link?.channel;
+  if (channel?.readyState === 'open' && channel.bufferedAmount < 65536) channel.send(JSON.stringify(packet));
+}
+function syncLink(time) {
+  if (!link?.ready || time < link.nextSend) return;
+  link.nextSend = time + (link.role === 'host' ? 67 : 45);
+  if (link.role === 'host') {
+    sendLink({type: 'world', state, skillPlayer, stage, elapsed, players, rivals, food, sparks, rings});
+  } else if (state === 'play') {
+    sendLink({type: 'steer', heading: control({player: 1})});
+  }
+}
+function receiveWorld(packet) {
+  ({stage, elapsed, players, rivals, food, sparks, rings} = packet);
+  mode = 2;
+  // Text-only HUD for the remote device.
+  stats.textContent = players.map((snake, i) => (i + 1) + 'P ' +
+    (snake.alive ? 'Lv. ' + formatLevel(snake.level) + ' · ' + snake.length + '마디' : '탈락')).join(' / ');
+  if (state === packet.state && (state !== 'skill' || skillPlayer === packet.skillPlayer)) return;
+  skillPlayer = packet.skillPlayer;
+  if (packet.state === 'play') {
+    resume();
+  } else {
+    state = packet.state;
+    if (state === 'skill' && skillPlayer === 1) {
+      dialog('2P · 첫 자동 기술', '레벨 ' + SKILL_LEVEL + '에 도달했어요. 앞으로 함께할 기술을 골라요.', [
+        ['반딧불 고리', () => sendLink({type: 'skill', skill: 'ring'})],
+        ['별빛 화살', () => sendLink({type: 'skill', skill: 'bolt'})]
+      ]);
+      return;
+    }
+    const finished = state === 'end';
+    dialog(finished ? '이번 탐험이 끝났어요' : '방장의 화면에서 계속할 수 있어요',
+      finished ? '방장이 다시 시작하면 함께 들어가요.' : '잠시 기다려 주세요.', [['연결 종료', menu]]);
+  }
+}
+
 menu();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(error => console.warn('게임 캐시 등록 실패', error));
@@ -770,7 +987,8 @@ let previousFrame;
 function frame(time) {
   const dt = Math.min(.033, (time - (previousFrame ?? time)) / 1000);
   previousFrame = time;
-  if (state === 'play') update(dt);
+  if (state === 'play' && link?.role !== 'guest') update(dt);
+  syncLink(time);
   draw();
   requestAnimationFrame(frame);
 }
